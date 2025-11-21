@@ -56,7 +56,9 @@ const LoginScreen = () => {
     }
   }
 
-  WebBrowser.maybeCompleteAuthSession();
+  if (Platform.OS === "web") {
+    WebBrowser.maybeCompleteAuthSession();
+  }
 
   const extra = Constants.expoConfig?.extra || {};
   const webClientId = extra.GOOGLE_WEB_CLIENT_ID ||

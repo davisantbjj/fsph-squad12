@@ -31,6 +31,7 @@ console.log("API_URL configurada:", API_URL); // Debug
 
 const api = axios.create({
   baseURL: API_URL,
+  timeout: 10000, // Timeout de 10 segundos para evitar loading infinito
 });
 
 api.interceptors.request.use(async (config) => {

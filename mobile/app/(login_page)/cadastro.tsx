@@ -53,7 +53,9 @@ const CadastroScreen = () => {
   const [isConfirmarSenhaVisible, setIsConfirmarSenhaVisible] = useState(false)
   const [loading, setLoading] = useState(false)
 
-  WebBrowser.maybeCompleteAuthSession();
+  if (Platform.OS === "web") {
+    WebBrowser.maybeCompleteAuthSession();
+  }
 
   const extra = Constants.expoConfig?.extra || {};
   const webClientId = extra.GOOGLE_WEB_CLIENT_ID ||
