@@ -1,7 +1,9 @@
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useMemo } from "react";
-import { Dimensions, Image, ImageBackground, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import React, { useMemo, useState } from "react";
+import { useFocusEffect } from '@react-navigation/native';
+import { Dimensions, Image, ImageBackground, StyleSheet, Text, TouchableOpacity, View, ActivityIndicator } from "react-native";
+import api from "@/src/services/api";
 
 const { width } = Dimensions.get("window");
 const CARD_WIDTH = width * 0.92;
@@ -9,6 +11,26 @@ const CARD_HEIGHT = CARD_WIDTH * 1.45;
 
 export default function CardPage() {
   const router = useRouter();
+  const [userData, setUserData] = useState<any | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      let mounted = true;
+      const fetchUser = async () => {
+        try {
+          const response = await api.get('/api/users/me');
+          if (mounted) setUserData(response.data);
+        } catch (error) {
+          console.error("Erro ao carregar dados do usuário para o cartão", error);
+        } finally {
+          if (mounted) setLoading(false);
+        }
+      };
+      fetchUser();
+      return () => { mounted = false; };
+    }, [])
+  );
 
   // Listas para atualizar os nomes e tipos sanguíneos
   const randomData = useMemo(() => {
@@ -21,6 +43,24 @@ export default function CardPage() {
       "Rafael Campos Dias"
     ];
     const tipos = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
+  useFocusEffect(
+    React.useCallback(() => {
+      let mounted = true;
+      const fetchUser = async () => {
+        try {
+          const response = await api.get('/api/users/me');
+          if (mounted) setUserData(response.data);
+        } catch (error) {
+          console.error("Erro ao carregar dados do usuário para o cartão", error);
+        } finally {
+          if (mounted) setLoading(false);
+        }
+      };
+      fetchUser();
+      return () => { mounted = false; };
+    }, [])
+  );
+>>>>>>> Stashed changes
 
     // Data de nascimento aleatória
     const randomDate = () => {
@@ -66,18 +106,18 @@ export default function CardPage() {
 
             <View style={styles.infoBox}>
               <Text style={styles.label}>NOME:</Text>
-              <Text style={styles.text}>{randomData.nome}</Text>
+              <Text style={styles.text}>{userData?.nome || randomData.nome}</Text>
 
               <Text style={[styles.label, { marginTop: 10 }]}>DATA DE NASCIMENTO:</Text>
-              <Text style={styles.text}>{randomData.nascimento}</Text>
+              <Text style={styles.text}>{userData?.nascimento || randomData.nascimento}</Text>
 
               <Text style={[styles.label, { marginTop: 10 }]}>Nº DE INSCRIÇÃO:</Text>
-              <Text style={styles.text}>{randomData.inscricao}</Text>
+              <Text style={styles.text}>{userData?.inscricao || randomData.inscricao}</Text>
             </View>
 
             <View style={styles.bloodBox}>
               <Text style={[styles.label, { marginBottom: 4 }]}>TIPO SANGUÍNEO:</Text>
-              <Text style={styles.blood}>{randomData.tipo}</Text>
+              <Text style={styles.blood}>{userData?.tipo || randomData.tipo}</Text>
             </View>
 
             <Image

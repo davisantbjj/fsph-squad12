@@ -16,7 +16,17 @@ import {
   View,
   StatusBar,
 } from "react-native"
-import { getLogin } from "./_auth"
+<<<<<<< Updated upstream
+import { getLogin } from "@/src/services/auth/auth"
+import api from "@/src/services/api";
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { setAuthToken } from '@/src/services/api';
+=======
+import { getLogin } from "@/src/services/auth/auth"
+import api from "@/src/services/api";
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { setAuthToken } from '@/src/services/api';
+>>>>>>> Stashed changes
 
 const colors = {
   primaryRed: "#D32F2F",
@@ -90,6 +100,8 @@ const LoginScreen = () => {
           const data = await res.json();
           if (res.ok && data.token) {
             console.log("✅ Login backend:", data);
+            await AsyncStorage.setItem('user_token', data.token);
+            setAuthToken(data.token);
             router.replace("/(home_page)/home_page");
           } else {
             alert(`Erro de autenticação: ${data.error || "Desconhecido"}`);

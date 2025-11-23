@@ -1,16 +1,31 @@
-// Mock data para simular campanhas
-const mockCampaigns = [
-  { id_campanha: 1, nome_campanha: 'Doe Sangue, Salve Vidas - Centro', descricao: 'Campanha de doação de sangue no centro da cidade.', data_inicio: new Date(), data_fim: new Date(), local_campanha: 'Praça Central', status_campanha: 'Ativa' },
-  { id_campanha: 2, nome_campanha: 'Semana da Doação - Hospital Regional', descricao: 'Participe da nossa campanha semanal no hospital.', data_inicio: new Date(), data_fim: new Date(), local_campanha: 'Hospital Regional', status_campanha: 'Ativa' }
-];
+import { getConnection } from "../config/database.js";
 
-// Função para listar as campanhas
+// Função para listar as campanhas a partir do banco de dados
 export const getCampaigns = async (req, res) => {
   try {
-    // Retorna os dados mockados
-    res.json(mockCampaigns);
+    const pool = await getConnection();
+    const query = `
+      SELECT
+        id_campanha,
+        nome_campanha,
+        descricao,
+        data_inicio,
+        data_fim,
+        local_campanha,
+        cidade,
+        estado,
+        vagas_disponiveis,
+        status_campanha
+      FROM campanhas
+      WHERE status_campanha IS NULL OR status_campanha = ?
+      ORDER BY data_inicio DESC
+    `;
+
+    const [rows] = await pool.query(query, ["Ativa"]);
+
+    res.json(rows);
   } catch (error) {
-    console.error('Erro ao buscar campanhas:', error);
-    res.status(500).json({ error: 'Erro interno no servidor.' });
+    console.error("Erro ao buscar campanhas:", error);
+    res.status(500).json({ error: "Erro interno no servidor." });
   }
 };

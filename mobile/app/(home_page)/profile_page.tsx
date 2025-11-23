@@ -1,7 +1,8 @@
 import { EvilIcons, Feather, Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { useRouter } from 'expo-router'; // Importe o useRouter!
+import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   Alert,
   Image,
@@ -15,6 +16,9 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import api from '@/src/services/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { setAuthToken } from '@/src/services/api';
 
 const defaultAvatar = require('../../assets/images/default-avatar.png');
 const appLogo = require('../../assets/images/logo.png');
@@ -27,6 +31,136 @@ export default function ProfilePage() {
   // Use o useRouter do Expo Router
   const router = useRouter();
 
+  useFocusEffect(
+    React.useCallback(() => {
+      loadProfile();
+    }, [])
+  );
+
+  const loadProfile = async () => {
+      try {
+        const token = await AsyncStorage.getItem('user_token');
+        if (!token) {
+          router.replace('/(login_page)/splash');
+          return;
+        }
+
+        // Ensure axios in-memory header is set from stored token to avoid race conditions
+        try { setAuthToken(token); } catch (e) { /* ignore */ }
+
+        // Primeiro tenta mostrar dados em cache para a UX ser mais rápida
+        try {
+          const cached = await AsyncStorage.getItem('user_data');
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            setUserInfo(parsed);
+            if (parsed.foto_perfil) setImageUri(parsed.foto_perfil);
+          }
+        } catch (e) {
+          // ignore cache errors
+        }
+
+        // Depois busca a versão atualizada no servidor
+        const response = await api.get('/api/users/me');
+        setUserInfo(response.data);
+        if (response.data.foto_perfil) {
+            setImageUri(response.data.foto_perfil);
+        } else {
+            // Se o servidor não retornar foto, mantemos a que já temos (cache) ou nulo
+        }
+      } catch (error) {
+        console.error("Erro ao carregar perfil", error);
+        const status = (error as any)?.response?.status;
+        const data = (error as any)?.response?.data;
+        console.warn('Erro detalhes:', { status, data });
+        if (status === 401) {
+          // Não desloga automaticamente ao abrir o perfil.
+          // Pergunta ao usuário se deseja tentar novamente ou sair.
+          Alert.alert(
+            'Sessão expirada',
+            'Sua sessão expirou ou o token é inválido. Deseja tentar novamente ou encerrar a sessão?',
+            [
+              { text: 'Tentar novamente', onPress: () => { loadProfile(); } },
+              { text: 'Sair', style: 'destructive', onPress: async () => {
+                try { await AsyncStorage.removeItem('user_token'); } catch (e) {}
+                setAuthToken(null);
+                router.replace('/(login_page)/splash');
+              } }
+            ],
+            { cancelable: true }
+          );
+          return;
+        }
+      } finally {
+          setLoading(false);
+      }
+  }
+  useFocusEffect(
+    React.useCallback(() => {
+      loadProfile();
+    }, [])
+  );
+
+  const loadProfile = async () => {
+      try {
+        const token = await AsyncStorage.getItem('user_token');
+        if (!token) {
+          router.replace('/(login_page)/splash');
+          return;
+        }
+
+        // Ensure axios in-memory header is set from stored token to avoid race conditions
+        try { setAuthToken(token); } catch (e) { /* ignore */ }
+
+        // Primeiro tenta mostrar dados em cache para a UX ser mais rápida
+        try {
+          const cached = await AsyncStorage.getItem('user_data');
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            setUserInfo(parsed);
+            if (parsed.foto_perfil) setImageUri(parsed.foto_perfil);
+          }
+        } catch (e) {
+          // ignore cache errors
+        }
+
+        // Depois busca a versão atualizada no servidor
+        const response = await api.get('/api/users/me');
+        setUserInfo(response.data);
+        if (response.data.foto_perfil) {
+            setImageUri(response.data.foto_perfil);
+        } else {
+            // Se o servidor não retornar foto, mantemos a que já temos (cache) ou nulo
+        }
+      } catch (error) {
+        console.error("Erro ao carregar perfil", error);
+        const status = (error as any)?.response?.status;
+        const data = (error as any)?.response?.data;
+        console.warn('Erro detalhes:', { status, data });
+        if (status === 401) {
+          // Não desloga automaticamente ao abrir o perfil.
+          // Pergunta ao usuário se deseja tentar novamente ou sair.
+          Alert.alert(
+            'Sessão expirada',
+            'Sua sessão expirou ou o token é inválido. Deseja tentar novamente ou encerrar a sessão?',
+            [
+              { text: 'Tentar novamente', onPress: () => { loadProfile(); } },
+              { text: 'Sair', style: 'destructive', onPress: async () => {
+                try { await AsyncStorage.removeItem('user_token'); } catch (e) {}
+                setAuthToken(null);
+                router.replace('/(login_page)/splash');
+              } }
+            ],
+            { cancelable: true }
+          );
+          return;
+        }
+      } finally {
+          setLoading(false);
+      }
+  }
+
+>>>>>>> Stashed changes
   const handlePickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
@@ -49,11 +183,22 @@ export default function ProfilePage() {
     }
   };
 
+<<<<<<< Updated upstream
   const handleLogout = () => {
     // router.replace garante que o usuário não possa "voltar"
     // para a tela de perfil após o logout.
     // Navega para o arquivo /app/(login_page)/login.tsx
     router.replace('/(login_page)/login');
+=======
+  const handleLogout = async () => {
+    try {
+        await AsyncStorage.removeItem('user_token');
+        setAuthToken(null);
+        router.replace('/(login_page)/splash');
+    } catch (e) {
+      console.error("Erro ao fazer logout", e);
+    }
+>>>>>>> Stashed changes
   };
 
   return (

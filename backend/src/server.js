@@ -10,6 +10,13 @@ import path from "path";
 // Carrega variáveis do .env
 dotenv.config();
 
+// Verifica configuração crítica
+if (!process.env.JWT_SECRET) {
+  console.error("FATAL: JWT_SECRET não encontrada nas variáveis de ambiente. Crie um arquivo .env a partir de .env.example e defina JWT_SECRET antes de iniciar o servidor.");
+  // Abort early para evitar aceitar/verificar tokens com fallback inseguro
+  process.exit(1);
+}
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -38,14 +45,32 @@ import estoqueRoutes from "./routes/estoque.js";
 import profileRoutes from "./routes/profile.js";
 import postsRoutes from "./routes/posts.js";
 import campaignsRoutes from "./routes/campaigns.js";
+import appointmentsRoutes from "./routes/appointments.js";
+import historyRoutes from "./routes/history.js";
+import rankingRoutes from "./routes/ranking.js";
+import debugRoutes from "./routes/debug.js";
 
 app.use("/api", routes);
 app.use("/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/estoque", estoqueRoutes);
 app.use("/api/profile", profileRoutes);
+// Serve uploads (fotos de perfil)
+import fs from 'fs';
+const uploadsDir = path.join(process.cwd(), 'uploads');
+try {
+  if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+} catch (err) {
+  console.warn('Não foi possível criar uploads dir:', err.message);
+}
+app.use('/uploads', express.static(uploadsDir));
 app.use("/api/posts", postsRoutes);
 app.use("/api/campaigns", campaignsRoutes);
+app.use("/api/appointments", appointmentsRoutes);
+app.use("/api/history", historyRoutes);
+app.use("/api/ranking", rankingRoutes);
+// Dev debug route: returns raw header e decoded payload (faz sua própria verificação)
+app.use("/api/debug", debugRoutes);
 
 // ==========================
 // MIDDLEWARE GLOBAL DE ERRO

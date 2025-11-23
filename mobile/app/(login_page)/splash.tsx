@@ -1,17 +1,41 @@
 import React, { useEffect } from 'react';
 import { StyleSheet, View, Image, SafeAreaView } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { setAuthToken } from '@/src/services/api';
 import { useRouter } from 'expo-router';
 
 export default function SplashScreen() {
   const router = useRouter();
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      router.replace('/(login_page)/test');
-    }, 5000); // 5 segundos
+    let mounted = true;
+    const init = async () => {
+      // tenta recuperar token para manter sessão
+      try {
+        const token = await AsyncStorage.getItem('user_token');
+        if (!mounted) return;
+        if (token) {
+          // configura header e vai pra home
+          setAuthToken(token);
+          router.replace('/(home_page)/home_page');
+          return;
+        }
+      } catch (e) {
+        // ignore
+      }
 
-    return () => clearTimeout(timer);
+      const timer = setTimeout(() => {
+        if (mounted) router.replace('/(login_page)/test');
+      }, 1200);
+      return () => clearTimeout(timer);
+    };
+
+    const cleanupPromise = init();
+    return () => {
+      mounted = false;
+      if (cleanupPromise && typeof cleanupPromise.then === 'function') cleanupPromise.then(() => {});
+    };
   }, [router]);
 
   return (
