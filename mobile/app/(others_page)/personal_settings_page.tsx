@@ -559,118 +559,103 @@ export default function PersonalSettingsPage() {
       } catch (error) {
           console.error("Erro ao salvar perfil", error);
           Alert.alert("Erro", "Não foi possível atualizar o perfil.");
-      } finally {
-          setSaving(false);
-      }
-  }
+        } finally {
+            setSaving(false);
+          }
+        }
 
->>>>>>> Stashed changes
-  return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.replace('/(home_page)/profile_page')}>
-          <Feather name="arrow-left" size={22} color="#333" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Configurações Pessoais</Text>
-        <View style={{ width: 28 }} />
-      </View>
-
-<<<<<<< Updated upstream
-      <ScrollView style={styles.container}>
-        <View style={styles.card}>
-          <TouchableOpacity style={styles.settingsItem}>
-            <View style={styles.settingsItemLeft}>
-              <Ionicons
-                name="person-outline"
-                size={22}
-                color="#555"
-                style={styles.settingsIcon}
-              />
-              <Text style={styles.settingsText}>Editar Informações</Text>
-=======
-      {loading ? (
-          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-              <ActivityIndicator size="large" color="#d32f2f" />
+        return (
+        <SafeAreaView style={styles.safeArea}>
+          <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+          <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.replace('/(home_page)/profile_page')}>
+            <Feather name="arrow-left" size={22} color="#333" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Configurações Pessoais</Text>
+          <View style={{ width: 28 }} />
           </View>
-      ) : (
-        <ScrollView style={styles.container}>
+
+          {loading ? (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+              <ActivityIndicator size="large" color="#d32f2f" />
+            </View>
+          ) : (
+          <ScrollView style={styles.container}>
             <View style={styles.card}>
-                <Text style={styles.sectionTitle}>Informações Básicas</Text>
+              <Text style={styles.sectionTitle}>Informações Básicas</Text>
 
-                <View style={styles.inputGroup}>
-                    <Text style={styles.label}>Nome Completo</Text>
-                    <TextInput
-                        style={[styles.input, !editing && styles.inputDisabled]}
-                        value={nome}
-                        onChangeText={setNome}
-                        editable={editing}
-                    />
-                </View>
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Nome Completo</Text>
+                <TextInput
+                  style={[styles.input, !editing && styles.inputDisabled]}
+                  value={nome}
+                  onChangeText={setNome}
+                  editable={editing}
+                />
+              </View>
 
-                <View style={styles.inputGroup}>
-                    <Text style={styles.label}>E-mail (não editável)</Text>
-                    <TextInput
-                        style={[styles.input, styles.inputDisabled]}
-                        value={email}
-                        editable={false}
-                    />
-                </View>
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>E-mail (não editável)</Text>
+                <TextInput
+                  style={[styles.input, styles.inputDisabled]}
+                  value={email}
+                  editable={false}
+                />
+              </View>
 
-                <View style={styles.inputGroup}>
-                    <Text style={styles.label}>Telefone</Text>
-                    <TextInput
-                        style={[styles.input, !editing && styles.inputDisabled]}
-                        value={telefone}
-                        onChangeText={setTelefone}
-                        editable={editing}
-                        keyboardType="phone-pad"
-                        placeholder="(xx) xxxxx-xxxx"
-                    />
-                </View>
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Telefone</Text>
+                <TextInput
+                  style={[styles.input, !editing && styles.inputDisabled]}
+                  value={telefone}
+                  onChangeText={setTelefone}
+                  editable={editing}
+                  keyboardType="phone-pad"
+                  placeholder="(xx) xxxxx-xxxx"
+                />
+              </View>
 
-                <View style={styles.inputGroup}>
-                    <Text style={styles.label}>CPF</Text>
-                    <TextInput
-                        style={[styles.input, !editing && styles.inputDisabled]}
-                        value={cpf}
-                        onChangeText={setCpf}
-                        editable={editing}
-                        keyboardType="numeric"
-                        placeholder="000.000.000-00"
-                    />
-                </View>
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>CPF</Text>
+                <TextInput
+                  style={[styles.input, !editing && styles.inputDisabled]}
+                  value={cpf}
+                  onChangeText={setCpf}
+                  editable={editing}
+                  keyboardType="numeric"
+                  placeholder="000.000.000-00"
+                />
+              </View>
 
-                <View style={styles.inputGroup}>
-                    <Text style={styles.label}>Data de Nascimento</Text>
-                    <TextInput
-                        style={[styles.input, !editing && styles.inputDisabled]}
-                        value={dataNascimento}
-                        onChangeText={setDataNascimento}
-                        editable={editing}
-                        placeholder="dd/mm/aaaa"
-                    />
-                </View>
-                  <View style={[styles.inputGroup, { alignItems: 'center' }]}>
-                      <Text style={styles.label}>Foto de Perfil</Text>
-                      {localImageUri ? (
-                          <Image source={{ uri: localImageUri }} style={{ width: 100, height: 100, borderRadius: 50, marginVertical: 8 }} />
-                      ) : (
-                          <View style={{ width: 100, height: 100, borderRadius: 50, backgroundColor: '#eee', marginVertical: 8 }} />
-                      )}
-                      <View style={{ flexDirection: 'row', gap: 8 }}>
-                          <TouchableOpacity onPress={handlePickImage} style={[styles.createAccountButton, { paddingVertical: 8, paddingHorizontal: 12, marginRight: 8 }]}> 
-                              <Text style={{ color: '#fff' }}>Selecionar</Text>
-                          </TouchableOpacity>
-                          <TouchableOpacity onPress={handleUploadPhoto} disabled={!localImageUri || saving} style={[styles.createAccountButton, { paddingVertical: 8, paddingHorizontal: 12 }]}>
-                              <Text style={{ color: '#fff' }}>{saving ? 'Enviando...' : 'Enviar'}</Text>
-                          </TouchableOpacity>
-                      </View>
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Data de Nascimento</Text>
+                <TextInput
+                  style={[styles.input, !editing && styles.inputDisabled]}
+                  value={dataNascimento}
+                  onChangeText={setDataNascimento}
+                  editable={editing}
+                  placeholder="dd/mm/aaaa"
+                />
+              </View>
+                <View style={[styles.inputGroup, { alignItems: 'center' }]}>
+                  <Text style={styles.label}>Foto de Perfil</Text>
+                  {localImageUri ? (
+                    <Image source={{ uri: localImageUri }} style={{ width: 100, height: 100, borderRadius: 50, marginVertical: 8 }} />
+                  ) : (
+                    <View style={{ width: 100, height: 100, borderRadius: 50, backgroundColor: '#eee', marginVertical: 8 }} />
+                  )}
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    <TouchableOpacity onPress={handlePickImage} style={[styles.createAccountButton, { paddingVertical: 8, paddingHorizontal: 12, marginRight: 8 }]}> 
+                      <Text style={{ color: '#fff' }}>Selecionar</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={handleUploadPhoto} disabled={!localImageUri || saving} style={[styles.createAccountButton, { paddingVertical: 8, paddingHorizontal: 12 }]}>
+                      <Text style={{ color: '#fff' }}>{saving ? 'Enviando...' : 'Enviar'}</Text>
+                    </TouchableOpacity>
                   </View>
->>>>>>> Stashed changes
+                </View>
             </View>
             <Ionicons name="chevron-forward" size={22} color="#999" />
-          </TouchableOpacity>
+            </TouchableOpacity>
           <View style={styles.divider} />
           <TouchableOpacity style={styles.settingsItem}>
             <View style={styles.settingsItemLeft}>

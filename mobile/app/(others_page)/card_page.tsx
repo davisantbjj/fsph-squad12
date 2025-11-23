@@ -43,24 +43,6 @@ export default function CardPage() {
       "Rafael Campos Dias"
     ];
     const tipos = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
-  useFocusEffect(
-    React.useCallback(() => {
-      let mounted = true;
-      const fetchUser = async () => {
-        try {
-          const response = await api.get('/api/users/me');
-          if (mounted) setUserData(response.data);
-        } catch (error) {
-          console.error("Erro ao carregar dados do usuário para o cartão", error);
-        } finally {
-          if (mounted) setLoading(false);
-        }
-      };
-      fetchUser();
-      return () => { mounted = false; };
-    }, [])
-  );
->>>>>>> Stashed changes
 
     // Data de nascimento aleatória
     const randomDate = () => {

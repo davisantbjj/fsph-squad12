@@ -278,8 +278,7 @@ export default function Frame116() {
     } catch (error) {
         console.error("Erro geral no loadData:", error);
     } finally {
-        setLoading(false);
->>>>>>> Stashed changes
+      setLoading(false);
     }
 
     setNextAppointment({ local, data, hora })
@@ -413,7 +412,6 @@ export default function Frame116() {
                 }
               >
                 <View style={styles.statTopRowSmall}>
-<<<<<<< Updated upstream
                   <View style={{ alignItems: "center", marginLeft: 10 }}>
                     <Text style={styles.statNumber}>{donationsCount}</Text>
                     <Text style={styles.statSeparator}>Doações</Text>
@@ -636,12 +634,8 @@ const styles = StyleSheet.create({
     color: "#fff",
   },
   a: {
-<<<<<<< Updated upstream
-    fontSize: 24,
-=======
-    fontSize: 22, // aumentado para melhor legibilidade do símbolo (+/-)
->>>>>>> Stashed changes
-    fontFamily: "Roboto-Regular",
+  fontSize: 24,
+  fontFamily: "Roboto-Regular",
   },
   alertaWrapper: {
     height: "auto",
