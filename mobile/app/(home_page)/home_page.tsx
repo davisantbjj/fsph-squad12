@@ -151,153 +151,12 @@ export default function Frame116() {
     } finally {
         setLoading(false);
     }
-  const [loading, setLoading] = React.useState(true);
-  const [userInfo, setUserInfo] = React.useState<any>(null);
-  const [estoque, setEstoque] = React.useState<any[]>([]);
-  const [nextAppointment, setNextAppointment] = React.useState<any>(null);
-  const [campaigns, setCampaigns] = React.useState<any[]>([]);
-  const [donationsCount, setDonationsCount] = React.useState<number>(0);
-  const [livesSaved, setLivesSaved] = React.useState<number>(0);
-  const [rankingProgress, setRankingProgress] = React.useState<number>(0);
-
-  // UseFocusEffect para recarregar dados sempre que a tela ganhar foco (ex: voltar do agendamento)
-  useFocusEffect(
-    React.useCallback(() => {
-      loadData();
-    }, [])
-  );
-
-  const loadData = async () => {
-    try {
-        setLoading(true);
-        // 1. Carregar dados do usuário
-        // Tenta pegar do storage primeiro para ser mais rápido, mas idealmente valida token
-        const token = await AsyncStorage.getItem('user_token');
-        if (!token) {
-          router.replace('/(login_page)/splash');
-          return;
-        }
-
-        // Busca perfil
-        try {
-            // Backend mount: app.use("/api/users", userRoutes); -> Rota: /me
-            const profileRes = await api.get('/api/users/me');
-            setUserInfo(profileRes.data);
-        } catch (e) {
-            console.log("Erro ao carregar perfil", e);
-        }
-
-        // 2. Carregar Estoque
-        try {
-            // Backend mount: app.use("/api/estoque", estoqueRoutes);
-            const estoqueRes = await api.get('/api/estoque');
-            setEstoque(estoqueRes.data || []);
-        } catch (e) {
-            console.log("Erro ao carregar estoque", e);
-        }
-
-        // 2.5 Carregar histórico do usuário para calcular estatísticas (doações, vidas salvas)
-        try {
-          const historyRes = await api.get('/api/history');
-          const history = Array.isArray(historyRes.data) ? historyRes.data : [];
-          // Conta doações — assumimos que `origin === 'donation'` marca uma doação
-          const donations = history.filter((h: any) => h.origin === 'donation' || h.tipo === 'doacao');
-          setDonationsCount(donations.length);
-          // Tenta somar um campo `vidas_salvas` ou equivalente; se não existir, usa o número de doações
-          const vidasSum = donations.reduce((acc: number, cur: any) => {
-            const possible = (cur.vidas_salavas ?? cur.vidasSalvas ?? cur.vidas);
-            const v = Number(possible || 0);
-            return acc + (isNaN(v) ? 0 : v);
-          }, 0);
-          setLivesSaved(vidasSum > 0 ? vidasSum : donations.length);
-        } catch (e) {
-          console.log("Erro ao carregar histórico para estatísticas", e);
-          setDonationsCount(0);
-          setLivesSaved(0);
-        }
-
-        // 3. Carregar Agendamentos (pegar o próximo)
-        try {
-            // Backend mount: app.use("/api/appointments", appointmentsRoutes);
-            const apptRes = await api.get('/api/appointments');
-            // Filtra apenas agendamentos futuros ou pendentes
-            const futureAppts = apptRes.data.filter((a: any) =>
-                new Date(a.data_agendamento) > new Date() && a.status_agendamento !== 'Cancelado'
-            );
-            // Ordena e pega o primeiro
-            if (futureAppts.length > 0) {
-                // Supondo que o back já retorna ordenado, mas garantindo
-                futureAppts.sort((a: any, b: any) => new Date(a.data_agendamento).getTime() - new Date(b.data_agendamento).getTime());
-
-                const next = futureAppts[0];
-                const dateObj = new Date(next.data_agendamento);
-                // Formata data e hora simples
-                setNextAppointment({
-                    local: next.local_agendamento,
-                    data: dateObj.toLocaleDateString('pt-BR'),
-                    hora: dateObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-                });
-            } else {
-                setNextAppointment(null);
-            }
-        } catch (e) {
-             console.log("Erro ao carregar agendamentos", e);
-        }
-
-        // 4. Carregar Campanhas
-        try {
-             // Backend mount: app.use("/api/campaigns", campaignsRoutes);
-             const campaignsRes = await api.get('/api/campaigns');
-             setCampaigns(campaignsRes.data || []);
-        } catch (e) {
-             console.log("Erro ao carregar campanhas", e);
-        }
-
-          // 5. Carregar ranking para calcular progresso do usuário
-          try {
-            const rankingRes = await api.get('/api/ranking');
-            const rankingList = Array.isArray(rankingRes.data) ? rankingRes.data : [];
-            if (rankingList.length > 0 && profileRes?.data) {
-              const userId = profileRes?.data?.id ?? profileRes?.data?.id_usuario ?? profileRes?.data?.user?.id;
-              const index = rankingList.findIndex((r: any) => r.id === userId || r.id_usuario === userId || r.user_id === userId || r.email === profileRes?.data?.email);
-              if (index >= 0) {
-                // progresso como posição relativa (0 = último, 1 = primeiro)
-                const progress = 1 - (index / (rankingList.length - 1 || 1));
-                setRankingProgress(Number.isFinite(progress) ? progress : 0);
-              } else {
-                setRankingProgress(0);
-              }
-            } else {
-              setRankingProgress(0);
-            }
-          } catch (e) {
-            console.log('Erro ao carregar ranking', e);
-            setRankingProgress(0);
-          }
-
-    } catch (error) {
-        console.error("Erro geral no loadData:", error);
-    } finally {
-      setLoading(false);
-    }
-
-    setNextAppointment({ local, data, hora })
-    Alert.alert(
-      "Agendamento confirmado",
-      `Local: ${local}\nData: ${data}\nHora: ${hora}`
-    )
-    // limpar campos e fechar formulário
-    setLocal("")
-    setData("")
-    setHora("")
-    setShowForm(false)
-  }
 
   const Line = () => {
     return <View style={styles.line} />
   }
 
-  const campaigns = [
+  const sampleCampaigns = [
     {
       name: "João Santos",
       donors: "3/10",
@@ -305,7 +164,9 @@ export default function Frame116() {
     },
     { name: "Sofia", donors: "45/50", bloodTypes: ["A-", "B-", "AB-", "O-"] },
     { name: "Simone", donors: "15/30", bloodTypes: [] },
-  ]
+  ];
+
+  const displayedCampaigns = (campaigns && campaigns.length > 0) ? campaigns : sampleCampaigns;
   return (
     <SafeAreaView style={styles.parent}>
       <StatusBar barStyle="dark-content" />
@@ -490,7 +351,7 @@ export default function Frame116() {
             style={styles.campaignsScroll}
             contentContainerStyle={styles.campaignsContent}
           >
-            {campaigns.map((campaign, index) => (
+            {displayedCampaigns.map((campaign, index) => (
               <View key={index} style={styles.campaignCard}>
                 <View style={styles.campaignHeader}>
                   <View style={styles.campaignUser}>
