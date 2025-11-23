@@ -1,6 +1,6 @@
 import api, { setAuthToken } from "@/src/services/api";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { validateCredentials } from "./credentials";
+import { validateCredentials } from "@/src/services/auth/credentials";
 
 export type GetLoginParams = {
   email: string
