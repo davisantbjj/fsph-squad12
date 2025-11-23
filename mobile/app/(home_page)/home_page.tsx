@@ -1,62 +1,18 @@
-import { ThemedText } from "@/components/ThemedText"
-import {
-  EvilIcons,
-  FontAwesome,
-  FontAwesome5,
-  FontAwesome6,
-  Ionicons,
-} from "@expo/vector-icons"
-import { useRouter } from "expo-router"
-import * as React from "react"
-import {
-  Alert,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native"
-import { SafeAreaView } from "react-native-safe-area-context"
-import { shadows } from "./_shadow"
+import React from 'react'
+import { SafeAreaView, Text, StyleSheet } from 'react-native'
 
-export default function Frame116() {
-  const router = useRouter()
-  const [loading, setLoading] = React.useState(true);
-  const [userInfo, setUserInfo] = React.useState<any>(null);
-  const [estoque, setEstoque] = React.useState<any[]>([]);
-  const [nextAppointment, setNextAppointment] = React.useState<any>(null);
-  const [campaigns, setCampaigns] = React.useState<any[]>([]);
-  const [donationsCount, setDonationsCount] = React.useState<number>(0);
-  const [livesSaved, setLivesSaved] = React.useState<number>(0);
-  const [rankingProgress, setRankingProgress] = React.useState<number>(0);
+export default function HomePagePlaceholder() {
+  return (
+    <SafeAreaView style={styles.container}>
+      <Text style={styles.text}>Home (placeholder) — bundle test</Text>
+    </SafeAreaView>
+  )
+}
 
-  // UseFocusEffect para recarregar dados sempre que a tela ganhar foco (ex: voltar do agendamento)
-  useFocusEffect(
-    React.useCallback(() => {
-      loadData();
-    }, [])
-  );
-
-  const loadData = async () => {
-    try {
-        setLoading(true);
-        // 1. Carregar dados do usuário
-        // Tenta pegar do storage primeiro para ser mais rápido, mas idealmente valida token
-        const token = await AsyncStorage.getItem('user_token');
-        if (!token) {
-          router.replace('/(login_page)/splash');
-          return;
-        }
-
-        // Busca perfil
-        try {
-            // Backend mount: app.use("/api/users", userRoutes); -> Rota: /me
-            const profileRes = await api.get('/api/users/me');
-            setUserInfo(profileRes.data);
-        } catch (e) {
-            console.log("Erro ao carregar perfil", e);
-        }
+const styles = StyleSheet.create({
+  container: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  text: { fontSize: 16 }
+})
 
         // 2. Carregar Estoque
         try {
@@ -226,7 +182,6 @@ export default function Frame116() {
             ) : (
                 <Text style={{ color: 'white' }}>Carregando estoque...</Text>
             )}
-          </View>
           </View>
         </View>
 
