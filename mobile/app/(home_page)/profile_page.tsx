@@ -76,7 +76,8 @@ export default function ProfilePage() {
   const handleLogout = async () => {
     try {
         await AsyncStorage.removeItem('user_token');
-        router.replace('/(login_page)/login');
+        // Ao sair, encaminhar para splash para reiniciar o fluxo do app
+        router.replace('/(login_page)/splash');
     } catch (e) {
         console.error("Erro ao fazer logout", e);
     }

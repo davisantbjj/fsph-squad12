@@ -1,16 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  StatusBar,
-  Platform,
-  ScrollView,
-  TextInput,
-  Alert,
-  ActivityIndicator
+    View,
+    Text,
+    TouchableOpacity,
+    StyleSheet,
+    StatusBar,
+    Platform,
+    ScrollView,
+    TextInput,
+    Alert,
+    ActivityIndicator,
+    Modal,
+    Pressable
 } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -26,6 +28,8 @@ export default function PersonalSettingsPage() {
   const [telefone, setTelefone] = useState("");
   const [cpf, setCpf] = useState("");
   const [dataNascimento, setDataNascimento] = useState("");
+    const [tipoSanguineo, setTipoSanguineo] = useState("");
+    const [showBloodPicker, setShowBloodPicker] = useState(false);
 
   // Campos que não vamos editar aqui mas mostramos
   const [email, setEmail] = useState("");
@@ -42,6 +46,7 @@ export default function PersonalSettingsPage() {
           setNome(user.nome_completo || "");
           setTelefone(user.telefone || "");
           setCpf(user.cpf || "");
+          setTipoSanguineo(user.tipo_sanguineo || "");
           // Formatar data se necessário (o back retorna ISO ou string formatada?)
           // Supondo ISO YYYY-MM-DD ou TIMESTAMP
           if (user.data_nascimento) {
@@ -70,11 +75,16 @@ export default function PersonalSettingsPage() {
               dataNascISO = `${ano}-${mes}-${dia}`;
           }
 
+          // Remover formatação antes de enviar
+          const cleanCpf = cpf ? cpf.replace(/\D/g, '') : undefined;
+          const cleanTelefone = telefone ? telefone.replace(/\D/g, '') : undefined;
+
           const payload: any = {
               nome_completo: nome,
-              telefone,
-              cpf
+              telefone: cleanTelefone,
+              cpf: cleanCpf
           };
+          if (tipoSanguineo) payload.tipo_sanguineo = tipoSanguineo;
           if (dataNascISO) payload.data_nascimento = dataNascISO;
 
           await api.put('/api/users/me', payload);
@@ -83,7 +93,9 @@ export default function PersonalSettingsPage() {
           setEditing(false);
       } catch (error) {
           console.error("Erro ao salvar perfil", error);
-          Alert.alert("Erro", "Não foi possível atualizar o perfil.");
+          // Mostrar mensagem do backend quando disponível
+          const msg = (error as any)?.response?.data?.error || "Não foi possível atualizar o perfil.";
+          Alert.alert("Erro", msg);
       } finally {
           setSaving(false);
       }
@@ -141,7 +153,15 @@ export default function PersonalSettingsPage() {
                     <TextInput
                         style={[styles.input, !editing && styles.inputDisabled]}
                         value={telefone}
-                        onChangeText={setTelefone}
+                        onChangeText={(t) => {
+                            // Formatar telefone (apenas dígitos permitidos)
+                            const digits = t.replace(/\D/g, '');
+                            // Aplicar máscara simples: (xx) xxxxx-xxxx ou (xx) xxxx-xxxx
+                            if (digits.length <= 2) setTelefone(digits);
+                            else if (digits.length <= 6) setTelefone(`(${digits.slice(0,2)}) ${digits.slice(2)}`);
+                            else if (digits.length <= 10) setTelefone(`(${digits.slice(0,2)}) ${digits.slice(2,6)}-${digits.slice(6)}`);
+                            else setTelefone(`(${digits.slice(0,2)}) ${digits.slice(2,7)}-${digits.slice(7,11)}`);
+                        }}
                         editable={editing}
                         keyboardType="phone-pad"
                         placeholder="(xx) xxxxx-xxxx"
@@ -153,7 +173,15 @@ export default function PersonalSettingsPage() {
                     <TextInput
                         style={[styles.input, !editing && styles.inputDisabled]}
                         value={cpf}
-                        onChangeText={setCpf}
+                        onChangeText={(t) => {
+                            // Aceitar apenas dígitos e aplicar máscara 000.000.000-00
+                            const digits = t.replace(/\D/g, '').slice(0,11);
+                            let formatted = digits;
+                            if (digits.length > 9) formatted = `${digits.slice(0,3)}.${digits.slice(3,6)}.${digits.slice(6,9)}-${digits.slice(9,11)}`;
+                            else if (digits.length > 6) formatted = `${digits.slice(0,3)}.${digits.slice(3,6)}.${digits.slice(6)}`;
+                            else if (digits.length > 3) formatted = `${digits.slice(0,3)}.${digits.slice(3)}`;
+                            setCpf(formatted);
+                        }}
                         editable={editing}
                         keyboardType="numeric"
                         placeholder="000.000.000-00"
@@ -165,10 +193,27 @@ export default function PersonalSettingsPage() {
                     <TextInput
                         style={[styles.input, !editing && styles.inputDisabled]}
                         value={dataNascimento}
-                        onChangeText={setDataNascimento}
+                        onChangeText={(t) => {
+                            // Apenas dígitos e barras, máscara dd/mm/aaaa
+                            const digits = t.replace(/\D/g, '').slice(0,8);
+                            let formatted = digits;
+                            if (digits.length >= 5) formatted = `${digits.slice(0,2)}/${digits.slice(2,4)}/${digits.slice(4)}`;
+                            else if (digits.length >= 3) formatted = `${digits.slice(0,2)}/${digits.slice(2)}`;
+                            setDataNascimento(formatted);
+                        }}
                         editable={editing}
                         placeholder="dd/mm/aaaa"
                     />
+                </View>
+
+                <View style={styles.inputGroup}>
+                    <Text style={styles.label}>Tipo Sanguíneo</Text>
+                    <TouchableOpacity
+                        style={[styles.input, !editing && styles.inputDisabled, { justifyContent: 'center' }]}
+                        onPress={() => editing && setShowBloodPicker(true)}
+                    >
+                        <Text>{tipoSanguineo || 'Selecione o tipo sanguíneo'}</Text>
+                    </TouchableOpacity>
                 </View>
             </View>
 
@@ -203,11 +248,30 @@ export default function PersonalSettingsPage() {
                 <Ionicons name="chevron-forward" size={22} color="#CC3333" />
             </TouchableOpacity>
             </View>
-        </ScrollView>
-      )}
+                </ScrollView>
+            )}
+
+            {/* Modal simples para seleção do tipo sanguíneo */}
+            <Modal visible={showBloodPicker} transparent animationType="fade">
+                <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', padding: 20 }}>
+                    <View style={{ backgroundColor: '#fff', borderRadius: 8, padding: 12 }}>
+                        <Text style={{ fontWeight: '700', marginBottom: 8 }}>Selecione o tipo sanguíneo</Text>
+                        {['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map((t) => (
+                            <Pressable key={t} onPress={() => { setTipoSanguineo(t); setShowBloodPicker(false); }} style={{ paddingVertical: 10 }}>
+                                <Text>{t}</Text>
+                            </Pressable>
+                        ))}
+                        <TouchableOpacity onPress={() => setShowBloodPicker(false)} style={{ marginTop: 8, alignSelf: 'flex-end' }}>
+                            <Text style={{ color: '#d32f2f' }}>Fechar</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
+
     </SafeAreaView>
   );
 }
+
 
 const styles = StyleSheet.create({
   safeArea: {

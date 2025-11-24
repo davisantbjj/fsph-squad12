@@ -32,6 +32,10 @@ const RankingItem = ({ item, index }: { item: any, index: number }) => {
             <View style={styles.infoContainer}>
                 <Text style={styles.name}>{item.nome}</Text>
                 <Text style={styles.donations}>{item.total_doacoes} doações</Text>
+                {/* Barra de progresso baseada em item.progress (0-100) */}
+                <View style={styles.progressBarBackground}>
+                    <View style={[styles.progressBarFill, { width: `${item.progress || 0}%` }]} />
+                </View>
             </View>
 
             {index === 0 && (
@@ -178,5 +182,18 @@ const styles = StyleSheet.create({
   donations: {
       fontSize: 14,
       color: '#666'
+  }
+  ,
+  progressBarBackground: {
+      height: 8,
+      backgroundColor: '#eee',
+      borderRadius: 6,
+      overflow: 'hidden',
+      marginTop: 8,
+      width: '60%'
+  },
+  progressBarFill: {
+      height: '100%',
+      backgroundColor: '#d32f2f'
   }
 });

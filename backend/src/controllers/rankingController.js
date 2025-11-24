@@ -28,10 +28,27 @@ export async function getRanking(req, res) {
              ORDER BY total_doacoes DESC
              LIMIT 10`
         );
-        return res.json(fallbackRows);
+      // Calcular progress relative ao maior total
+      const max = fallbackRows.length > 0 ? Number(fallbackRows[0].total_doacoes) : 0;
+      const withProgress = fallbackRows.map(r => ({
+        nome: r.nome,
+        foto_perfil: r.foto_perfil,
+        total_doacoes: Number(r.total_doacoes),
+        progress: max > 0 ? Math.round((Number(r.total_doacoes) / max) * 100) : 0
+      }));
+      return res.json(withProgress);
     }
 
-    res.json(rows);
+    // Normal case: temos valores em contador_doacoes
+    const max = rows.length > 0 ? Number(rows[0].total_doacoes) : 0;
+    const withProgress = rows.map(r => ({
+      nome: r.nome,
+      foto_perfil: r.foto_perfil,
+      total_doacoes: Number(r.total_doacoes),
+      progress: max > 0 ? Math.round((Number(r.total_doacoes) / max) * 100) : 0
+    }));
+
+    res.json(withProgress);
 
   } catch (error) {
     console.error("Erro ao buscar ranking:", error);

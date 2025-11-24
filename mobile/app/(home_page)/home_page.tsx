@@ -29,8 +29,12 @@ export default function Frame116() {
   const [loading, setLoading] = React.useState(true);
   const [userInfo, setUserInfo] = React.useState<any>(null);
   const [estoque, setEstoque] = React.useState<any[]>([]);
+  const [lastEstoqueUpdate, setLastEstoqueUpdate] = React.useState<Date | null>(null);
   const [nextAppointment, setNextAppointment] = React.useState<any>(null);
   const [campaigns, setCampaigns] = React.useState<any[]>([]);
+  const [donationsCount, setDonationsCount] = React.useState<number>(0);
+  const [livesSaved, setLivesSaved] = React.useState<number>(0);
+  const [userProgress, setUserProgress] = React.useState<number>(0);
 
   // UseFocusEffect para recarregar dados sempre que a tela ganhar foco (ex: voltar do agendamento)
   useFocusEffect(
@@ -46,8 +50,9 @@ export default function Frame116() {
         // Tenta pegar do storage primeiro para ser mais rápido, mas idealmente valida token
         const token = await AsyncStorage.getItem('user_token');
         if (!token) {
-            router.replace('/(login_page)/login');
-            return;
+          // Quando não houver token, redirecionar para splash para recarregar todo o app
+          router.replace('/(login_page)/splash');
+          return;
         }
 
         // Busca perfil
@@ -61,28 +66,47 @@ export default function Frame116() {
 
         // 2. Carregar Estoque
         try {
-            // Backend mount: app.use("/api/estoque", estoqueRoutes);
-            const estoqueRes = await api.get('/api/estoque');
-            setEstoque(estoqueRes.data || []);
+          // Backend mount: app.use("/api/estoque", estoqueRoutes);
+          const estoqueRes = await api.get('/api/estoque');
+          setEstoque(estoqueRes.data || []);
+          // marca o horário da última atualização localmente
+          setLastEstoqueUpdate(new Date());
         } catch (e) {
-            console.log("Erro ao carregar estoque", e);
+          console.log("Erro ao carregar estoque", e);
         }
 
         // 3. Carregar Agendamentos (pegar o próximo)
         try {
             // Backend mount: app.use("/api/appointments", appointmentsRoutes);
             const apptRes = await api.get('/api/appointments');
-            // Filtra apenas agendamentos futuros ou pendentes
-            const futureAppts = apptRes.data.filter((a: any) =>
-                new Date(a.data_agendamento) > new Date() && a.status_agendamento !== 'Cancelado'
-            );
+          // Filtra apenas agendamentos futuros ou pendentes
+          const tryParseDate = (val: any) => {
+            if (!val) return null;
+            // If already a Date or number
+            if (val instanceof Date) return val;
+            const asString = String(val);
+            let d = new Date(asString);
+            if (!isNaN(d.getTime())) return d;
+            // Try replacing space with 'T' (common MySQL -> JS issue)
+            d = new Date(asString.replace(' ', 'T'));
+            if (!isNaN(d.getTime())) return d;
+            // Try appending seconds
+            d = new Date(asString.replace(' ', 'T') + ':00');
+            if (!isNaN(d.getTime())) return d;
+            return null;
+          };
+
+          const futureAppts = apptRes.data.filter((a: any) => {
+            const parsed = tryParseDate(a.data_agendamento);
+            return parsed && parsed.getTime() > Date.now() && a.status_agendamento !== 'Cancelado';
+          });
             // Ordena e pega o primeiro
             if (futureAppts.length > 0) {
                 // Supondo que o back já retorna ordenado, mas garantindo
                 futureAppts.sort((a: any, b: any) => new Date(a.data_agendamento).getTime() - new Date(b.data_agendamento).getTime());
 
                 const next = futureAppts[0];
-                const dateObj = new Date(next.data_agendamento);
+                const dateObj = tryParseDate(next.data_agendamento) || new Date(next.data_agendamento);
                 // Formata data e hora simples
                 setNextAppointment({
                     local: next.local_agendamento,
@@ -105,6 +129,32 @@ export default function Frame116() {
              console.log("Erro ao carregar campanhas", e);
         }
 
+        // 5. Carregar Histórico do usuário para calcular estatísticas (remover dados mockados)
+        try {
+          const historyRes = await api.get('/api/history');
+          const historyData = historyRes.data || [];
+          const donations = historyData.filter((h: any) => h.origin === 'donation' || h.type === 'Doação Realizada');
+          const donationsNumber = donations.length;
+          // Estimativa simples: cada doação pode salvar ~3 vidas (ajustável se backend fornecer outra métrica)
+          const estimatedLives = donationsNumber * 3;
+          setDonationsCount(donationsNumber);
+          setLivesSaved(estimatedLives);
+          // Try to compute a user progress percent based on ranking top value
+          try {
+            const rankingRes = await api.get('/api/ranking');
+            const ranking = rankingRes.data || [];
+            const max = ranking.length > 0 ? (ranking[0].total_doacoes || ranking[0].total_doacoes === 0 ? Number(ranking[0].total_doacoes) : (ranking[0].total_doacoes ?? 0)) : 0;
+            const userTotal = donationsNumber;
+            const percent = max > 0 ? Math.round((userTotal / max) * 100) : 0;
+            setUserProgress(percent);
+          } catch (e) {
+            // ignore ranking errors, keep default
+            console.log('Erro ao carregar ranking para progresso do usuário', e);
+          }
+        } catch (e) {
+          console.log('Erro ao carregar histórico para stats', e);
+        }
+
     } catch (error) {
         console.error("Erro geral no loadData:", error);
     } finally {
@@ -117,12 +167,25 @@ export default function Frame116() {
   }
 
   // Mapeamento de níveis de alerta para texto e cor (simplificado)
-  const getAlertLevel = (situacao: string) => {
-      switch(situacao?.toLowerCase()) {
+  const normalize = (s?: string) => {
+    if (!s) return '';
+    try {
+      return s.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '').trim();
+    } catch (e) {
+      // fallback for environments without Unicode property escapes
+      return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    }
+  };
+
+  const getAlertLevel = (situacao?: string) => {
+      const key = normalize(situacao);
+      switch(key) {
+          case 'critico':
           case 'critico': return { text: 'Crítico', color: '#D32F2F' }; // Vermelho
           case 'alerta': return { text: 'Alerta', color: '#F57C00' };   // Laranja
+          case 'estavel':
           case 'estavel': return { text: 'Estável', color: '#388E3C' }; // Verde
-          default: return { text: '---', color: '#999' };
+          default: return { text: situacao || '---', color: '#999' };
       }
   };
 
@@ -181,28 +244,49 @@ export default function Frame116() {
             </Text>
           </View>
 
-          {/* Grid de Estoque Dinâmico */}
+          {/* Carousel de Estoque (horizontal) */}
           <View style={[styles.frameGroup, styles.viewFlexBox]}>
             {estoque.length > 0 ? (
-                estoque.slice(0, 5).map((item, index) => {
-                    const alert = getAlertLevel(item.situacao);
-                    return (
-                        <View key={index} style={styles.frameBorder}>
-                            <View style={[styles.vectorParent, styles.vectorFlexBox]}>
-                                <FontAwesome6 name="droplet" size={24} color="white" />
-                                <Text style={[styles.a, styles.aFlexBox]}>{item.grupoabo}{item.fatorrh}</Text>
-                            </View>
-                            <Line />
-                            <View style={[styles.alertaWrapper, styles.wrapperBorder]}>
-                                <Text style={[styles.alertaTypo, { color: '#FFF' }]}>{item.situacao}</Text>
-                            </View>
-                        </View>
-                    )
-                })
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.carouselContent}
+              >
+                {estoque.map((item, index) => {
+                  const alert = getAlertLevel(item.situacao);
+                  // Ajustar fator RH: backend usa 'P'/'N' — mostrar '+' e '-'
+                  let rhSymbol = item.fatorrh;
+                  if (typeof rhSymbol === 'string') {
+                    if (rhSymbol.toUpperCase() === 'P') rhSymbol = '+';
+                    else if (rhSymbol.toUpperCase() === 'N') rhSymbol = '-';
+                  }
+                  return (
+                    <View key={index} style={[styles.frameBorder, styles.carouselItem]}>
+                      <View style={[styles.vectorParent, styles.vectorFlexBox]}>
+                        <FontAwesome6 name="droplet" size={24} color="white" />
+                        <Text style={[styles.a, styles.aFlexBox]}>{item.grupoabo}{rhSymbol}</Text>
+                      </View>
+                      <Line />
+                      <View style={[styles.alertaWrapper, styles.wrapperBorder]}>
+                        <Text style={[styles.alertaTypo, { color: '#FFF' }]}>{alert.text}</Text>
+                      </View>
+                    </View>
+                  )
+                })}
+              </ScrollView>
             ) : (
-                <Text style={{ color: 'white' }}>Carregando estoque...</Text>
+              <Text style={{ color: 'white' }}>Carregando estoque...</Text>
             )}
           </View>
+        </View>
+
+        {/* Última atualização do estoque (apenas data/hora pequena e clara, sem caixa) */}
+        <View style={styles.updateContainer}>
+          <Text style={styles.updateSmallText}>
+            {lastEstoqueUpdate
+              ? `${lastEstoqueUpdate.toLocaleDateString('pt-BR')} — ${lastEstoqueUpdate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
+              : "—"}
+          </Text>
         </View>
 
         {/* Agendamentos */}
@@ -249,8 +333,8 @@ export default function Frame116() {
               >
                 <View style={styles.statTopRowSmall}>
                   <View style={{ alignItems: "center", marginLeft: 10 }}>
-                    {/* Dados mockados por enquanto, precisa de endpoint específico ou cálculo no front */}
-                    <Text style={styles.statNumber}>2</Text>
+                    {/* Estatísticas carregadas do histórico */}
+                    <Text style={styles.statNumber}>{donationsCount}</Text>
                     <Text style={styles.statSeparator}>Doações</Text>
                   </View>
                   <View style={{ alignItems: "center", marginLeft: 10 }}>
@@ -266,7 +350,7 @@ export default function Frame116() {
                         size={22}
                         color="#d32f2f"
                       />
-                      <Text style={styles.statNumber}>8</Text>
+                      <Text style={styles.statNumber}>{livesSaved}</Text>
                     </View>
                     <Text style={styles.statSeparator}>Vidas salvas</Text>
                   </View>
@@ -301,7 +385,7 @@ export default function Frame116() {
                       </Text>
                     </View>
                     <View style={styles.progressBar}>
-                      <View style={styles.progressFill} />
+                      <View style={[styles.progressFill, { width: `${userProgress}%` }]} />
                     </View>
                   </View>
                 </View>
@@ -381,11 +465,13 @@ const styles = StyleSheet.create({
   },
   wrapperBorder: {
     height: "auto",
-    padding: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
     borderStyle: "solid",
     justifyContent: "center",
     alignItems: "center",
     overflow: "hidden",
+    borderRadius: 6,
   },
   frameBorder: {
     height: "90%",
@@ -394,7 +480,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderStyle: "solid",
     overflow: "hidden",
-    width: 60,
+    width: 72,
     marginHorizontal: 2,
   },
   alertaTypo: {
@@ -403,6 +489,7 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontFamily: "Roboto-Bold",
     fontWeight: "700",
+    textTransform: 'uppercase',
   },
   view: {
     width: "100%",
@@ -456,8 +543,16 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     alignItems: "center",
     flex: 1,
-    justifyContent: 'space-around', // distribui melhor
+    justifyContent: 'flex-start', // alinhamento sem espaçamento entre itens
     paddingHorizontal: 5,
+  },
+  carouselContent: {
+    alignItems: 'center',
+    paddingHorizontal: 8,
+  },
+  carouselItem: {
+    width: 76,
+    marginHorizontal: 6,
   },
   vectorParent: {
     height: 54,
@@ -532,6 +627,18 @@ const styles = StyleSheet.create({
     marginTop: 16,
     width: "90%",
     alignSelf: "center",
+  },
+  updateContainer: {
+    marginTop: 12,
+    width: "90%",
+    alignSelf: "center",
+  },
+  updateSmallText: {
+    fontSize: 12,
+    color: '#9b9b9b',
+    textAlign: 'left',
+    width: '100%',
+    paddingLeft: 8,
   },
   scheduleTitle: {
     fontSize: 16,

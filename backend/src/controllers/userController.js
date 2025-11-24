@@ -26,6 +26,9 @@ async function updateUserProfile(req, res) {
     const userId = req.user.id;
     const updateData = req.body;
 
+    // Debug: log payload recebido
+    console.info('[updateUserProfile] payload:', updateData);
+
     // Remove campos que não devem ser atualizados diretamente pelo usuário
     delete updateData.id_usuario;
     delete updateData.email; // O email geralmente requer um processo de verificação para ser alterado
@@ -33,7 +36,25 @@ async function updateUserProfile(req, res) {
     delete updateData.senha;
     delete updateData.data_criacao;
 
-    const updatedUser = await updateUserById(userId, updateData);
+    // Sanitize campos esperados: CPF e telefone (remove qualquer caractere não numérico)
+    if (updateData.cpf && typeof updateData.cpf === 'string') {
+      updateData.cpf = updateData.cpf.replace(/\D/g, '');
+    }
+    if (updateData.telefone && typeof updateData.telefone === 'string') {
+      updateData.telefone = updateData.telefone.replace(/\D/g, '');
+    }
+
+    let updatedUser;
+    try {
+      updatedUser = await updateUserById(userId, updateData);
+    } catch (dbError) {
+      console.error('[updateUserProfile] DB error:', dbError && dbError.code, dbError && dbError.sqlMessage || dbError.message);
+      // Tratamento de erro de entrada duplicada (ex: CPF ou outro campo UNIQUE)
+      if (dbError && dbError.code === 'ER_DUP_ENTRY') {
+        return res.status(409).json({ error: 'Valor já cadastrado no sistema (provavelmente CPF ou outro campo único).' });
+      }
+      throw dbError; // rethrow para ser tratado no catch abaixo
+    }
 
     if (!updatedUser) {
       return res.status(404).json({ error: "Usuário não encontrado." });

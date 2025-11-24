@@ -51,6 +51,41 @@ export default function SchedulingPage() {
   const [email, setEmail] = useState<string>("")
   const [telefone, setTelefone] = useState<string>("")
 
+  // Carregar perfil do usuário para preencher dados do doador automaticamente
+  React.useEffect(() => {
+    let mounted = true;
+    const loadProfile = async () => {
+      try {
+        const res = await api.get('/api/users/me');
+        const u = res.data || {};
+        if (!mounted) return;
+        // Formatar CPF para máscara 000.000.000-00
+        if (u.cpf) setCpf(formatCPF(String(u.cpf)));
+        if (u.nome_completo) setNome(u.nome_completo);
+        if (u.email) setEmail(u.email);
+        if (u.telefone) setTelefone(formatNumber(String(u.telefone)));
+        if (u.data_nascimento) {
+          // backend geralmente retorna YYYY-MM-DD
+          const d = new Date(u.data_nascimento);
+          if (!isNaN(d.getTime())) {
+            const dd = String(d.getDate()).padStart(2, '0');
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const yyyy = d.getFullYear();
+            setDataNascimento(`${dd}/${mm}/${yyyy}`);
+          } else {
+            // fallback: raw string
+            setDataNascimento(String(u.data_nascimento));
+          }
+        }
+      } catch (error) {
+        console.log('Não foi possível carregar perfil para auto-fill do agendamento', error);
+      }
+    }
+
+    loadProfile();
+    return () => { mounted = false }
+  }, [])
+
   // Local de Doação
   const [selectedCity, setSelectedCity] = useState<string | null>(null)
   const [selectedLocal, setSelectedLocal] = useState<string | null>(null)
@@ -61,6 +96,28 @@ export default function SchedulingPage() {
   // Em um app real, usaria um DatePicker
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
+
+  // Formatação de data/time local (mascara)
+  const formatDateInput = (raw: string) => {
+    const digits = raw.replace(/\D/g, '').slice(0,8);
+    if (digits.length <= 2) return digits;
+    if (digits.length <= 4) return `${digits.slice(0,2)}/${digits.slice(2)}`;
+    return `${digits.slice(0,2)}/${digits.slice(2,4)}/${digits.slice(4)}`;
+  }
+
+  const handleDateChange = (text: string) => {
+    setDate(formatDateInput(text));
+  }
+
+  const formatTimeInput = (raw: string) => {
+    const digits = raw.replace(/\D/g, '').slice(0,4);
+    if (digits.length <= 2) return digits;
+    return `${digits.slice(0,2)}:${digits.slice(2)}`;
+  }
+
+  const handleTimeChange = (text: string) => {
+    setTime(formatTimeInput(text));
+  }
 
   const cities = ["Aracaju"]
   const locationsByCity: Record<string, string[]> = {
@@ -120,16 +177,31 @@ export default function SchedulingPage() {
           const [day, month, year] = date.split('/');
           const formattedDate = `${year}-${month}-${day} ${time}:00`;
 
-          const payload = {
+            // Incluir info do doador no payload (opcional) para rastreabilidade
+            const donorCpfClean = cpf ? cpf.replace(/\D/g, '') : null;
+            const donorTelefoneClean = telefone ? telefone.replace(/\D/g, '') : null;
+
+            const payload = {
               data_agendamento: formattedDate,
               tipo_agendamento: selected,
               local_agendamento: selectedLocal,
               cidade: selectedCity,
               pre_triagem: {
-                  perguntas_respostas: selectedPreAnswers
-                  // peso, altura etc poderiam ser coletados se houvesse inputs
+                perguntas_respostas: selectedPreAnswers
+              },
+              donor_info: {
+                nome_completo: nome,
+                cpf: donorCpfClean,
+                telefone: donorTelefoneClean,
+                email,
+                data_nascimento: dataNascimento && dataNascimento.includes('/') ?
+                // converter dd/mm/yyyy para YYYY-MM-DD
+                (() => {
+                  const [dd, mm, yyyy] = dataNascimento.split('/');
+                  return `${yyyy}-${mm}-${dd}`;
+                })() : dataNascimento
               }
-          };
+            };
 
           await api.post('/api/appointments', payload);
 
@@ -546,16 +618,18 @@ export default function SchedulingPage() {
                   style={styles.input}
                   placeholder="20/10/2025"
                   value={date}
-                  onChangeText={setDate}
+                  onChangeText={handleDateChange}
                   keyboardType="numbers-and-punctuation"
+                  maxLength={10}
                 />
                 <Text style={styles.label}>Hora (HH:MM)</Text>
                 <TextInput
                     style={styles.input}
                     placeholder="09:00"
                     value={time}
-                    onChangeText={setTime}
+                    onChangeText={handleTimeChange}
                     keyboardType="numbers-and-punctuation"
+                    maxLength={5}
                 />
               </View>
             )}

@@ -33,10 +33,43 @@ export async function getHistory(req, res) {
     );
 
     // Unifica e ordena
-    const history = [
-        ...doacoes.map(d => ({...d, origin: 'donation'})),
-        ...agendamentos.map(a => ({...a, origin: 'appointment'}))
-    ].sort((a, b) => new Date(b.date) - new Date(a.date));
+    // Normaliza datas para ISO antes de unificar
+    // Normalize dates to ISO-like without timezone suffix (YYYY-MM-DDTHH:mm:ss)
+    const normDoacoes = doacoes.map(d => {
+      let dateStr = null;
+      if (d.date instanceof Date) {
+        const D = d.date;
+        const YYYY = D.getFullYear();
+        const MM = String(D.getMonth() + 1).padStart(2, '0');
+        const DD = String(D.getDate()).padStart(2, '0');
+        const hh = String(D.getHours()).padStart(2, '0');
+        const mm = String(D.getMinutes()).padStart(2, '0');
+        const ss = String(D.getSeconds()).padStart(2, '0');
+        dateStr = `${YYYY}-${MM}-${DD}T${hh}:${mm}:${ss}`;
+      } else if (typeof d.date === 'string') {
+        dateStr = d.date.replace(' ', 'T').replace(/Z$/, '');
+      }
+      return { ...d, date: dateStr, origin: 'donation' };
+    });
+
+    const normAgend = agendamentos.map(a => {
+      let dateStr = null;
+      if (a.date instanceof Date) {
+        const D = a.date;
+        const YYYY = D.getFullYear();
+        const MM = String(D.getMonth() + 1).padStart(2, '0');
+        const DD = String(D.getDate()).padStart(2, '0');
+        const hh = String(D.getHours()).padStart(2, '0');
+        const mm = String(D.getMinutes()).padStart(2, '0');
+        const ss = String(D.getSeconds()).padStart(2, '0');
+        dateStr = `${YYYY}-${MM}-${DD}T${hh}:${mm}:${ss}`;
+      } else if (typeof a.date === 'string') {
+        dateStr = a.date.replace(' ', 'T').replace(/Z$/, '');
+      }
+      return { ...a, date: dateStr, origin: 'appointment' };
+    });
+
+    const history = [...normDoacoes, ...normAgend].sort((a, b) => new Date(b.date) - new Date(a.date));
 
     res.json(history);
 

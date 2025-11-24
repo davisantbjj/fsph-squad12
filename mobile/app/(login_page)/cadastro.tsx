@@ -127,9 +127,16 @@ const CadastroScreen = () => {
       const response = await api.post('/auth/register', payload);
 
       if (response.status === 201 || response.status === 200) {
-        Alert.alert("Sucesso", "Conta criada com sucesso! Faça login para continuar.", [
-          { text: "OK", onPress: () => router.replace("/(login_page)/login") }
-        ]);
+        // Backend já retorna token e dados do usuário no registro -> fazer auto-login
+        const data = response.data;
+        if (data && data.token) {
+          await AsyncStorage.setItem('user_token', data.token);
+          router.replace("/(home_page)/home_page");
+          return;
+        }
+
+        // Caso o backend não retorne token, navegar para splash para recarregar o app
+        router.replace("/(login_page)/splash");
       } else {
         Alert.alert("Erro", "Não foi possível criar a conta. Tente novamente.");
       }
