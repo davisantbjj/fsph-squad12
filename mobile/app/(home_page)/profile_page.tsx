@@ -1,7 +1,7 @@
 import { EvilIcons, Feather, Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { useRouter } from 'expo-router'; // Importe o useRouter!
-import React, { useState } from 'react';
+import { useRouter } from 'expo-router';
+import React, { useState, useEffect } from 'react';
 import {
   Alert,
   Image,
@@ -13,8 +13,11 @@ import {
   Text,
   TouchableOpacity,
   View,
+  ActivityIndicator
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import api from '@/src/services/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const defaultAvatar = require('../../assets/images/default-avatar.png');
 const appLogo = require('../../assets/images/logo.png');
@@ -23,9 +26,28 @@ export default function ProfilePage() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [darkModeEnabled, setDarkModeEnabled] = useState(false);
   const [imageUri, setImageUri] = useState<string | null>(null);
+  const [userInfo, setUserInfo] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
-  // Use o useRouter do Expo Router
   const router = useRouter();
+
+  useEffect(() => {
+      loadProfile();
+  }, []);
+
+  const loadProfile = async () => {
+      try {
+          const response = await api.get('/api/users/me');
+          setUserInfo(response.data);
+          if (response.data.foto_perfil) {
+              setImageUri(response.data.foto_perfil);
+          }
+      } catch (error) {
+          console.error("Erro ao carregar perfil", error);
+      } finally {
+          setLoading(false);
+      }
+  }
 
   const handlePickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -46,15 +68,28 @@ export default function ProfilePage() {
 
     if (!result.canceled) {
       setImageUri(result.assets[0].uri);
+      // Aqui você implementaria o upload da imagem para o backend
+      // await uploadImage(result.assets[0].uri);
     }
   };
 
-  const handleLogout = () => {
-    // router.replace garante que o usuário não possa "voltar"
-    // para a tela de perfil após o logout.
-    // Navega para o arquivo /app/(login_page)/login.tsx
-    router.replace('/(login_page)/login');
+  const handleLogout = async () => {
+    try {
+        await AsyncStorage.removeItem('user_token');
+        // Ao sair, encaminhar para splash para reiniciar o fluxo do app
+        router.replace('/(login_page)/splash');
+    } catch (e) {
+        console.error("Erro ao fazer logout", e);
+    }
   };
+
+  if (loading) {
+      return (
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+              <ActivityIndicator size="large" color="#D32F2F" />
+          </View>
+      )
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -77,8 +112,8 @@ export default function ProfilePage() {
               style={styles.avatar}
             />
           </TouchableOpacity>
-          <Text style={styles.profileName}>Juliana Santos</Text>
-          <TouchableOpacity onPress={handlePickImage}>
+          <Text style={styles.profileName}>{userInfo?.nome_completo || "Usuário"}</Text>
+          <TouchableOpacity onPress={() => router.push("/(others_page)/personal_settings_page")}>
             <Text style={styles.editProfileText}>Editar Perfil</Text>
           </TouchableOpacity>
         </View>
@@ -87,7 +122,7 @@ export default function ProfilePage() {
           {/* Nova opção: Cartão do Doador */}
           <TouchableOpacity
             style={styles.settingsItem}
-            onPress={() => router.push("/card_page")}
+            onPress={() => router.push("/(others_page)/card_page" as any)}
           >
             <View style={styles.settingsItemLeft}>
               <Feather
@@ -219,7 +254,7 @@ export default function ProfilePage() {
 
         <TouchableOpacity
           style={styles.logoutButton}
-          onPress={() => router.replace("/")}
+          onPress={handleLogout}
         >
           <Ionicons name="log-out-outline" size={22} color="#FFFFFF" />
           <Text style={styles.logoutButtonText}>Sair do aplicativo</Text>

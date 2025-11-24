@@ -1,21 +1,14 @@
-import { getConnection } from '../config/database.js';
+// Mock data para simular postagens
+const mockPosts = [
+  { id: 1, id_usuario: 1, conteudo_texto: 'Primeira postagem do feed!', imagem_url: null, curtidas: 10, data_postagem: new Date() },
+  { id: 2, id_usuario: 2, conteudo_texto: 'Olá, mundo!', imagem_url: null, curtidas: 5, data_postagem: new Date() }
+];
 
-// Função para listar as postagens (do DB)
+// Função para listar as postagens
 export const getPosts = async (req, res) => {
   try {
-    const pool = await getConnection();
-    const [rows] = await pool.query(
-      `SELECT
-         id_postagem as id,
-         id_usuario,
-         conteudo_texto,
-         imagem_url,
-         curtidas,
-         data_postagem
-       FROM postagens
-       ORDER BY data_postagem DESC`
-    );
-    res.json(rows);
+    // Por enquanto, retorna os dados mockados
+    res.json(mockPosts);
   } catch (error) {
     console.error('Erro ao buscar postagens:', error);
     res.status(500).json({ error: 'Erro interno no servidor.' });
@@ -26,17 +19,16 @@ export const getPosts = async (req, res) => {
 export const createPost = async (req, res) => {
   try {
     const { conteudo_texto, imagem_url } = req.body;
-    const pool = await getConnection();
-    const [result] = await pool.query(
-      'INSERT INTO postagens (id_usuario, conteudo_texto, imagem_url, curtidas) VALUES (?, ?, ?, ?)',
-      [req.user.id, conteudo_texto || null, imagem_url || null, 0]
-    );
-
-    const insertedId = result.insertId;
-    const [rows] = await pool.query('SELECT id_postagem as id, id_usuario, conteudo_texto, imagem_url, curtidas, data_postagem FROM postagens WHERE id_postagem = ?', [insertedId]);
-    const post = rows.length > 0 ? rows[0] : null;
-
-    res.status(201).json({ message: 'Postagem criada com sucesso!', post });
+    const newPost = {
+      id: mockPosts.length + 1,
+      id_usuario: req.user.id, // ID do usuário logado
+      conteudo_texto,
+      imagem_url,
+      curtidas: 0,
+      data_postagem: new Date()
+    };
+    mockPosts.push(newPost);
+    res.status(201).json({ message: 'Postagem criada com sucesso!', post: newPost });
   } catch (error) {
     console.error('Erro ao criar postagem:', error);
     res.status(500).json({ error: 'Erro interno no servidor.' });

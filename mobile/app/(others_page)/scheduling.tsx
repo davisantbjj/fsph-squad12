@@ -12,8 +12,11 @@ import {
   TouchableOpacity,
   UIManager,
   View,
+  Alert,
+  ActivityIndicator,
 } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
+import api from "@/src/services/api";
 
 // Habilita animação de layout no Android
 if (
@@ -25,34 +28,100 @@ if (
 
 export default function SchedulingPage() {
   const router = useRouter()
+  const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(true)
-  const [selected, setSelected] = useState<string | null>(null)
+  const [selected, setSelected] = useState<string | null>(null) // Tipo de agendamento
   const [openPre, setOpenPre] = useState(false)
-  // respostas da pré-triagem por id da pergunta
+
+  // Respostas da pré-triagem
   const [selectedPreAnswers, setSelectedPreAnswers] = useState<
     Record<string, string | null>
   >({})
-  const hasPreAnswers = Object.values(selectedPreAnswers).some((v) => !!v)
+  const hasPreAnswers = Object.values(selectedPreAnswers).length >= 4; // Valida se respondeu as 4 perguntas
 
   const [openDados, setOpenDados] = useState(false)
   const [openLocal, setOpenLocal] = useState(false)
   const [openDataHora, setOpenDataHora] = useState(false)
   const [openVerif, setOpenVerif] = useState(false)
+
   // Dados do doador
   const [cpf, setCpf] = useState<string>("")
   const [nome, setNome] = useState<string>("")
   const [dataNascimento, setDataNascimento] = useState<string>("")
   const [email, setEmail] = useState<string>("")
   const [telefone, setTelefone] = useState<string>("")
-  // Local de Doação: cidades e locais
+
+  // Carregar perfil do usuário para preencher dados do doador automaticamente
+  React.useEffect(() => {
+    let mounted = true;
+    const loadProfile = async () => {
+      try {
+        const res = await api.get('/api/users/me');
+        const u = res.data || {};
+        if (!mounted) return;
+        // Formatar CPF para máscara 000.000.000-00
+        if (u.cpf) setCpf(formatCPF(String(u.cpf)));
+        if (u.nome_completo) setNome(u.nome_completo);
+        if (u.email) setEmail(u.email);
+        if (u.telefone) setTelefone(formatNumber(String(u.telefone)));
+        if (u.data_nascimento) {
+          // backend geralmente retorna YYYY-MM-DD
+          const d = new Date(u.data_nascimento);
+          if (!isNaN(d.getTime())) {
+            const dd = String(d.getDate()).padStart(2, '0');
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const yyyy = d.getFullYear();
+            setDataNascimento(`${dd}/${mm}/${yyyy}`);
+          } else {
+            // fallback: raw string
+            setDataNascimento(String(u.data_nascimento));
+          }
+        }
+      } catch (error) {
+        console.log('Não foi possível carregar perfil para auto-fill do agendamento', error);
+      }
+    }
+
+    loadProfile();
+    return () => { mounted = false }
+  }, [])
+
+  // Local de Doação
   const [selectedCity, setSelectedCity] = useState<string | null>(null)
   const [selectedLocal, setSelectedLocal] = useState<string | null>(null)
   const [showCityList, setShowCityList] = useState(false)
   const [showLocalList, setShowLocalList] = useState(false)
 
+  // Data e Hora
+  // Em um app real, usaria um DatePicker
+  const [date, setDate] = useState("");
+  const [time, setTime] = useState("");
+
+  // Formatação de data/time local (mascara)
+  const formatDateInput = (raw: string) => {
+    const digits = raw.replace(/\D/g, '').slice(0,8);
+    if (digits.length <= 2) return digits;
+    if (digits.length <= 4) return `${digits.slice(0,2)}/${digits.slice(2)}`;
+    return `${digits.slice(0,2)}/${digits.slice(2,4)}/${digits.slice(4)}`;
+  }
+
+  const handleDateChange = (text: string) => {
+    setDate(formatDateInput(text));
+  }
+
+  const formatTimeInput = (raw: string) => {
+    const digits = raw.replace(/\D/g, '').slice(0,4);
+    if (digits.length <= 2) return digits;
+    return `${digits.slice(0,2)}:${digits.slice(2)}`;
+  }
+
+  const handleTimeChange = (text: string) => {
+    setTime(formatTimeInput(text));
+  }
+
   const cities = ["Aracaju"]
   const locationsByCity: Record<string, string[]> = {
-    Aracaju: ["HEMOSE"],
+    Aracaju: ["HEMOSE", "Shopping Jardins (Campanha)", "Shopping Riomar (Campanha)"],
   }
 
   const toggleOpen = () => {
@@ -64,34 +133,88 @@ export default function SchedulingPage() {
   const goToNext = () => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut)
     if (open) {
-      setOpen(false)
-      setOpenPre(true)
-      return
+        if (!selected) { Alert.alert("Selecione um tipo de agendamento"); return; }
+        setOpen(false)
+        setOpenPre(true)
+        return
     }
     if (openPre) {
-      setOpenPre(false)
-      setOpenDados(true)
-      return
+        if (!hasPreAnswers) { Alert.alert("Responda todas as perguntas da pré-triagem"); return; }
+        setOpenPre(false)
+        setOpenDados(true)
+        return
     }
     if (openDados) {
-      setOpenDados(false)
-      setOpenLocal(true)
-      return
+        if(!cpf || !nome || !email) { Alert.alert("Preencha os dados obrigatórios"); return; }
+        setOpenDados(false)
+        setOpenLocal(true)
+        return
     }
     if (openLocal) {
-      setOpenLocal(false)
-      setOpenDataHora(true)
-      return
+        if(!selectedLocal) { Alert.alert("Selecione um local"); return; }
+        setOpenLocal(false)
+        setOpenDataHora(true)
+        return
     }
     if (openDataHora) {
-      setOpenDataHora(false)
-      setOpenVerif(true)
-      return
+        // Validação simples de data/hora manual
+        if (!date || !time) { Alert.alert("Informe data e hora"); return; }
+        setOpenDataHora(false)
+        setOpenVerif(true)
+        return
     }
-    // Se estiver no último passo, apenas fechar tudo (ou você pode navegar/confirmar aqui)
+    // Se estiver no último passo, submeter
     if (openVerif) {
-      console.log("Fluxo finalizado")
+      submitAppointment();
     }
+  }
+
+  const submitAppointment = async () => {
+      try {
+          setLoading(true);
+          // Monta data ISO aproximada (YYYY-MM-DD HH:mm:ss)
+          // date espera formato DD/MM/YYYY
+          const [day, month, year] = date.split('/');
+          const formattedDate = `${year}-${month}-${day} ${time}:00`;
+
+            // Incluir info do doador no payload (opcional) para rastreabilidade
+            const donorCpfClean = cpf ? cpf.replace(/\D/g, '') : null;
+            const donorTelefoneClean = telefone ? telefone.replace(/\D/g, '') : null;
+
+            const payload = {
+              data_agendamento: formattedDate,
+              tipo_agendamento: selected,
+              local_agendamento: selectedLocal,
+              cidade: selectedCity,
+              pre_triagem: {
+                perguntas_respostas: selectedPreAnswers
+              },
+              donor_info: {
+                nome_completo: nome,
+                cpf: donorCpfClean,
+                telefone: donorTelefoneClean,
+                email,
+                data_nascimento: dataNascimento && dataNascimento.includes('/') ?
+                // converter dd/mm/yyyy para YYYY-MM-DD
+                (() => {
+                  const [dd, mm, yyyy] = dataNascimento.split('/');
+                  return `${yyyy}-${mm}-${dd}`;
+                })() : dataNascimento
+              }
+            };
+
+          await api.post('/api/appointments', payload);
+
+          Alert.alert("Sucesso", "Agendamento realizado com sucesso!", [
+              { text: "OK", onPress: () => router.replace('/(home_page)/home_page') }
+          ]);
+
+      } catch (error) {
+          console.error("Erro ao agendar:", error);
+          Alert.alert("Erro", "Não foi possível realizar o agendamento. Verifique os dados e tente novamente.");
+      } finally {
+          setLoading(false);
+      }
   }
 
   // Formata CPF enquanto o usuário digita: 000.000.000-00
@@ -164,8 +287,6 @@ export default function SchedulingPage() {
               style={styles.cardHeader}
               onPress={toggleOpen}
               activeOpacity={0.8}
-              accessibilityRole="button"
-              accessibilityState={{ expanded: open }}
             >
               <Text style={styles.cardTitle}>Tipo de agendamento</Text>
               <EvilIcons
@@ -230,8 +351,6 @@ export default function SchedulingPage() {
             </TouchableOpacity>
             {openPre && (
               <View style={styles.cardBody}>
-                {/* Lista de perguntas de pré-triagem */}
-                {/* Cada pergunta pode usar opções Sim/Não, exceto 'sexo' que tem Masculino/Feminino */}
                 {(
                   [
                     { id: "primeira", label: "Primeira vez doando sangue?" },
@@ -341,13 +460,11 @@ export default function SchedulingPage() {
                     value={dataNascimento}
                     onChangeText={handleNascimentoChange}
                     returnKeyType="next"
+                    maxLength={10}
                   />
                   <TouchableOpacity
                     style={styles.iconButton}
                     activeOpacity={0.7}
-                    onPress={() => {
-                      /* abrir picker se implementar */
-                    }}
                   >
                     <Feather name="calendar" size={20} color="#bdbdbd" />
                   </TouchableOpacity>
@@ -437,9 +554,8 @@ export default function SchedulingPage() {
                 <TouchableOpacity
                   style={styles.select}
                   onPress={() => {
-                    // só abre lista de locais se cidade selecionada
                     if (!selectedCity) {
-                      setShowCityList(true)
+                      Alert.alert("Selecione uma cidade primeiro")
                       return
                     }
                     setShowLocalList((s) => !s)
@@ -497,9 +613,24 @@ export default function SchedulingPage() {
             </TouchableOpacity>
             {openDataHora && (
               <View style={styles.cardBody}>
-                <Text style={styles.instruction}>
-                  Selecione data e hora (picker)
-                </Text>
+                <Text style={styles.label}>Data (dd/mm/aaaa)</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="20/10/2025"
+                  value={date}
+                  onChangeText={handleDateChange}
+                  keyboardType="numbers-and-punctuation"
+                  maxLength={10}
+                />
+                <Text style={styles.label}>Hora (HH:MM)</Text>
+                <TextInput
+                    style={styles.input}
+                    placeholder="09:00"
+                    value={time}
+                    onChangeText={handleTimeChange}
+                    keyboardType="numbers-and-punctuation"
+                    maxLength={5}
+                />
               </View>
             )}
           </View>
@@ -526,7 +657,16 @@ export default function SchedulingPage() {
             {openVerif && (
               <View style={styles.cardBody}>
                 <Text style={styles.instruction}>
-                  Revisão das informações antes de confirmar
+                  Tipo: {options.find(o => o.id === selected)?.label}
+                </Text>
+                <Text style={styles.instruction}>
+                  Local: {selectedLocal}, {selectedCity}
+                </Text>
+                <Text style={styles.instruction}>
+                  Data/Hora: {date} às {time}
+                </Text>
+                <Text style={styles.instruction}>
+                   Ao confirmar, você concorda com os termos de doação.
                 </Text>
               </View>
             )}
@@ -536,23 +676,36 @@ export default function SchedulingPage() {
         </View>
       </ScrollView>
 
-      {/* Footer fixo: colocado fora do ScrollView para permanecer na tela */}
+      {/* Footer fixo */}
       <View style={styles.footerFixed} pointerEvents="box-none">
         <TouchableOpacity
           style={styles.backFooter}
-          onPress={() => router.back()}
+          onPress={() => {
+              if (openVerif) setOpenVerif(false);
+              else if (openDataHora) setOpenDataHora(false);
+              else if (openLocal) setOpenLocal(false);
+              else if (openDados) setOpenDados(false);
+              else if (openPre) setOpenPre(false);
+              else if (open) router.back();
+              else setOpen(true); // fallback
+          }}
         >
           <Text style={styles.backFooterText}>Voltar</Text>
         </TouchableOpacity>
+
         <TouchableOpacity
           style={[
             styles.advanceFooter,
             !selected && !hasPreAnswers && styles.nextButtonDisabled,
           ]}
           onPress={goToNext}
-          disabled={!selected && !hasPreAnswers}
+          disabled={loading}
         >
-          <Text style={styles.advanceFooterText}>Avançar</Text>
+          {loading ? (
+               <ActivityIndicator color="#FFF" />
+          ) : (
+              <Text style={styles.advanceFooterText}>{openVerif ? "Confirmar" : "Avançar"}</Text>
+          )}
         </TouchableOpacity>
       </View>
     </SafeAreaView>

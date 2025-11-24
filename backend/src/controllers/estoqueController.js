@@ -11,12 +11,15 @@ const formatDate = (date) => {
 };
 
 export const getEstoque = async (req, res) => {
-  let conn;
   try {
-    conn = await getConnection();
-    const [rows] = await conn.query('SELECT grupoabo, fatorrh, updated, situacao, cobertura FROM estoque ORDER BY grupoabo, fatorrh');
+    // conn aqui é o POOL, não uma conexão única
+    const pool = await getConnection();
+    const [rows] = await pool.query('SELECT grupoabo, fatorrh, updated, situacao, cobertura FROM estoque ORDER BY grupoabo, fatorrh');
 
     const formattedData = rows.map(row => ({
+      grupoabo: row.grupoabo,
+      fatorrh: row.fatorrh,
+      // Mantemos a estrutura original caso o front precise, ou adaptamos
       tipo: `${row.grupoabo}${row.fatorrh}`,
       data_atualizacao: formatDate(row.updated),
       situacao: row.situacao,
@@ -27,9 +30,6 @@ export const getEstoque = async (req, res) => {
   } catch (err) {
     console.error('Erro ao consultar estoque no DB:', err);
     res.status(500).json({ error: 'Erro ao consultar o estoque de sangue.' });
-  } finally {
-    if (conn) {
-      await conn.end();
-    }
   }
+  // NÃO chamar pool.end() aqui! O pool deve ficar aberto.
 };

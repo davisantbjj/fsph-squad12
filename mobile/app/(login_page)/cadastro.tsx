@@ -1,7 +1,8 @@
 import { Feather } from "@expo/vector-icons"
 import { Stack, useRouter } from "expo-router"
-import React, { useState } from "react"
+import React, { useState, useEffect } from "react"
 import {
+  ActivityIndicator,
   Image,
   ImageSourcePropType,
   ScrollView,
@@ -11,7 +12,13 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  Alert,
 } from "react-native"
+import api from "@/src/services/api";
+import { useIdTokenAuthRequest } from 'expo-auth-session/providers/google';
+import * as WebBrowser from 'expo-web-browser';
+import Constants from 'expo-constants';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export function getServerSideProps() {
   console.log("SSR redirect to / (login_page)/splash")
@@ -44,6 +51,103 @@ const CadastroScreen = () => {
   const [confirmarSenha, setConfirmarSenha] = useState("")
   const [isSenhaVisible, setIsSenhaVisible] = useState(false)
   const [isConfirmarSenhaVisible, setIsConfirmarSenhaVisible] = useState(false)
+  const [loading, setLoading] = useState(false)
+
+  WebBrowser.maybeCompleteAuthSession();
+
+  const extra = Constants.expoConfig?.extra || {};
+  const webClientId = extra.GOOGLE_WEB_CLIENT_ID ||
+    '186834080659-bvsr5g2ocvu78j8dq2sa8oj6kdm0nbn2.apps.googleusercontent.com';
+  const androidClientId = extra.GOOGLE_ANDROID_CLIENT_ID ||
+    '186834080659-bvsr5g2ocvu78j8dq2sa8oj6kdm0nbn2.apps.googleusercontent.com';
+  const iosClientId = extra.GOOGLE_IOS_CLIENT_ID ||
+    '186834080659-bvsr5g2ocvu78j8dq2sa8oj6kdm0nbn2.apps.googleusercontent.com';
+
+  const [request, response, promptAsync] = useIdTokenAuthRequest({
+    webClientId,
+    androidClientId,
+    iosClientId,
+    scopes: ['openid', 'profile', 'email'],
+  });
+
+  useEffect(() => {
+    if (response?.type === "success") {
+      const idToken = response.params?.id_token;
+      handleGoogleLogin(idToken);
+    }
+  }, [response]);
+
+  const handleGoogleLogin = async (idToken: string | undefined) => {
+      if (!idToken) return;
+
+      try {
+          setLoading(true); // Usa o mesmo loading do form
+          const res = await api.post("/auth/google", { idToken });
+          if (res.status === 200 && res.data.token) {
+              await AsyncStorage.setItem('user_token', res.data.token);
+              router.replace("/(home_page)/home_page");
+          } else {
+              Alert.alert("Erro", `Erro de autenticação: ${res.data.error || "Desconhecido"}`);
+          }
+      } catch (error) {
+          console.error("Erro no login google:", error);
+          Alert.alert("Erro", "Falha ao conectar com o servidor.");
+      } finally {
+          setLoading(false);
+      }
+  }
+
+  const handleRegister = async () => {
+    if (!nome || !email || !senha || !confirmarSenha) {
+      Alert.alert("Erro", "Por favor, preencha todos os campos.");
+      return;
+    }
+
+    if (senha !== confirmarSenha) {
+      Alert.alert("Erro", "As senhas não coincidem.");
+      return;
+    }
+
+    // Validação básica de senha (ex: min 6 chars)
+    if (senha.length < 6) {
+       Alert.alert("Erro", "A senha deve ter no mínimo 6 caracteres.");
+       return;
+    }
+
+    setLoading(true);
+    try {
+      // O endpoint de registro espera { nome_completo, email, senha }
+      // O banco de dados pede 'nome_completo', mas o frontend usa 'nome'. Ajustando o payload.
+      const payload = {
+        nome_completo: nome,
+        email,
+        senha
+      };
+
+      const response = await api.post('/auth/register', payload);
+
+      if (response.status === 201 || response.status === 200) {
+        // Backend já retorna token e dados do usuário no registro -> fazer auto-login
+        const data = response.data;
+        if (data && data.token) {
+          await AsyncStorage.setItem('user_token', data.token);
+          router.replace("/(home_page)/home_page");
+          return;
+        }
+
+        // Caso o backend não retorne token, navegar para splash para recarregar o app
+        router.replace("/(login_page)/splash");
+      } else {
+        Alert.alert("Erro", "Não foi possível criar a conta. Tente novamente.");
+      }
+    } catch (error: any) {
+      console.error("Erro no registro:", error);
+      const msg = error.response?.data?.error || "Erro ao conectar ao servidor. Verifique sua conexão.";
+      Alert.alert("Erro", msg);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <View style={styles.safeArea}>
@@ -120,9 +224,17 @@ const CadastroScreen = () => {
           <TouchableOpacity
             style={styles.createAccountButton}
             activeOpacity={0.8}
+            onPress={handleRegister}
+            disabled={loading}
           >
-            <Text style={styles.createAccountButtonText}>Criar conta</Text>
-            <Feather name="arrow-up-right" size={20} color={colors.white} />
+             {loading ? (
+                <ActivityIndicator color={colors.white} />
+              ) : (
+                <>
+                  <Text style={styles.createAccountButtonText}>Criar conta</Text>
+                  <Feather name="arrow-up-right" size={20} color={colors.white} />
+                </>
+              )}
           </TouchableOpacity>
 
           <View style={styles.dividerContainer}>
@@ -132,7 +244,11 @@ const CadastroScreen = () => {
           </View>
 
           <View style={styles.socialLoginContainer}>
-            <TouchableOpacity style={styles.socialButton}>
+            <TouchableOpacity
+                style={styles.socialButton}
+                onPress={() => promptAsync()}
+                disabled={!request || loading}
+            >
               <Image source={googleLogo} style={styles.socialLogo} />
               <Text style={styles.socialButtonText}>Google</Text>
             </TouchableOpacity>

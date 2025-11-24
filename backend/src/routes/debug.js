@@ -18,11 +18,10 @@ router.get('/me', (req, res) => {
   const token = parts.length > 1 ? parts.slice(1).join(' ') : parts[0];
 
   try {
-    const secret = process.env.JWT_SECRET;
-    if (!secret) {
-      return res.status(500).json({ ...result, ok: false, error: 'JWT_SECRET não configurada no servidor.' });
+    if (!process.env.JWT_SECRET) {
+      return res.status(500).json({ ok: false, error: 'JWT_SECRET não configurada no servidor' });
     }
-    const decoded = jwt.verify(token, secret);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
     return res.status(200).json({ ...result, ok: true, decoded });
   } catch (err) {
     return res.status(200).json({ ...result, ok: false, error: err.message });

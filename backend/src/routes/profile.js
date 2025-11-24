@@ -18,17 +18,7 @@ const storage = multer.diskStorage({
 		cb(null, name);
 	}
 });
-// Limites e validação: tamanho máximo 2MB, tipos permitidos jpeg/png
-function fileFilter (req, file, cb) {
-  const allowed = ['image/jpeg', 'image/png', 'image/jpg'];
-  if (allowed.includes(file.mimetype)) {
-    cb(null, true);
-  } else {
-    cb(new Error('Tipo de arquivo inválido. Apenas JPEG/PNG permitidos.'), false);
-  }
-}
-
-const upload = multer({ storage, limits: { fileSize: 2 * 1024 * 1024 }, fileFilter });
+const upload = multer({ storage });
 
 const router = express.Router();
 
@@ -43,7 +33,7 @@ router.put('/', updateProfile);
 // Rota para upload de foto de perfil
 router.post('/photo', upload.single('photo'), async (req, res) => {
 	try {
-		if (!req.file) return res.status(400).json({ error: 'Arquivo não enviado ou tipo inválido.' });
+		if (!req.file) return res.status(400).json({ error: 'Arquivo não enviado.' });
 		// Monta URL pública
 		const host = req.get('host');
 		const protocol = req.protocol;

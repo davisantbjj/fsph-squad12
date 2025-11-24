@@ -1,7 +1,8 @@
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useMemo } from "react";
-import { Dimensions, Image, ImageBackground, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import React, { useState, useEffect } from "react";
+import { Dimensions, Image, ImageBackground, StyleSheet, Text, TouchableOpacity, View, ActivityIndicator } from "react-native";
+import api from "@/src/services/api";
 
 const { width } = Dimensions.get("window");
 const CARD_WIDTH = width * 0.92;
@@ -9,38 +10,44 @@ const CARD_HEIGHT = CARD_WIDTH * 1.45;
 
 export default function CardPage() {
   const router = useRouter();
+  const [userData, setUserData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
-  // Listas para atualizar os nomes e tipos sanguíneos
-  const randomData = useMemo(() => {
-    const nomes = [
-      "Lucas Andrade",
-      "Marcos Vinícius Silva",
-      "João Pedro Nascimento",
-      "Felipe Moura Santos",
-      "Eduardo Almeida",
-      "Rafael Campos Dias"
-    ];
-    const tipos = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
-
-    // Data de nascimento aleatória
-    const randomDate = () => {
-      const d = new Date(
-        1990 + Math.floor(Math.random() * 15),
-        Math.floor(Math.random() * 12),
-        Math.floor(Math.random() * 28) + 1
-      );
-      return d.toLocaleDateString("pt-BR");
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const response = await api.get('/api/users/me');
+        setUserData(response.data);
+      } catch (error) {
+        console.error("Erro ao carregar dados do usuário para o cartão", error);
+      } finally {
+        setLoading(false);
+      }
     };
-    const randomId = () => Math.floor(100000 + Math.random() * 900000).toString();
-
-    // Retorna os dados aleatórios: nome, data de nascimento, inscrição e tipo sanguíneo
-    return {
-      nome: nomes[Math.floor(Math.random() * nomes.length)],
-      nascimento: randomDate(),
-      inscricao: randomId(),
-      tipo: tipos[Math.floor(Math.random() * tipos.length)],
-    };
+    fetchUser();
   }, []);
+
+  // Função auxiliar para formatar data de nascimento
+  const formatDate = (dateString: string) => {
+    if (!dateString) return "";
+    // Se já estiver formatado
+    if (dateString.includes('/')) return dateString;
+    // Se for ISO
+    try {
+        const d = new Date(dateString);
+        return d.toLocaleDateString('pt-BR');
+    } catch {
+        return "";
+    }
+  };
+
+  if (loading) {
+      return (
+          <View style={[styles.container, { justifyContent: 'center' }]}>
+              <ActivityIndicator size="large" color="#d32f2f" />
+          </View>
+      );
+  }
 
   return (
     <View style={styles.container}>
@@ -66,18 +73,20 @@ export default function CardPage() {
 
             <View style={styles.infoBox}>
               <Text style={styles.label}>NOME:</Text>
-              <Text style={styles.text}>{randomData.nome}</Text>
+              <Text style={styles.text}>{userData?.nome_completo || ""}</Text>
 
               <Text style={[styles.label, { marginTop: 10 }]}>DATA DE NASCIMENTO:</Text>
-              <Text style={styles.text}>{randomData.nascimento}</Text>
+              <Text style={styles.text}>{formatDate(userData?.data_nascimento) || ""}</Text>
 
               <Text style={[styles.label, { marginTop: 10 }]}>Nº DE INSCRIÇÃO:</Text>
-              <Text style={styles.text}>{randomData.inscricao}</Text>
+              {/* Usando ID do usuário como inscrição ou campo específico se existir */}
+              <Text style={styles.text}>{userData?.id_usuario ? String(userData.id_usuario).padStart(6, '0') : ""}</Text>
             </View>
 
             <View style={styles.bloodBox}>
               <Text style={[styles.label, { marginBottom: 4 }]}>TIPO SANGUÍNEO:</Text>
-              <Text style={styles.blood}>{randomData.tipo}</Text>
+              {/* Exibe tipo sanguíneo se disponível, senão vazio ou placeholder */}
+              <Text style={styles.blood}>{userData?.tipo_sanguineo || ""}</Text>
             </View>
 
             <Image

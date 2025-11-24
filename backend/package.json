@@ -11,6 +11,7 @@
     "test": "jest",
     "init-db": "node src/scripts/init-db.js",
     "importar-estoque": "node src/scripts/importarEstoque.js"
+    ,"check-env": "node src/scripts/check-env.js"
   },
   "dependencies": {
     "axios": "^1.12.2",
@@ -26,8 +27,7 @@
   },
   "devDependencies": {
     "eslint": "^8.56.0",
-    "jest": "^29.7.0",
-    "supertest": "^6.3.3"
+    "jest": "^29.7.0"
   },
   "engines": {
     "node": ">=18.0.0"

@@ -16,7 +16,9 @@ import {
   View,
   StatusBar,
 } from "react-native"
-import { getLogin } from "./_auth"
+import { getLogin } from "@/src/services/auth/auth"
+import api from "@/src/services/api";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const colors = {
   primaryRed: "#D32F2F",
@@ -43,7 +45,9 @@ const LoginScreen = () => {
   const [loading, setLoading] = useState(false)
 
   async function handleSubmit() {
+    setLoading(true);
     const value = await getLogin({ email, senha })
+    setLoading(false);
     console.log(value)
     if (value.success) {
       router.replace("/(home_page)/home_page")
@@ -80,16 +84,13 @@ const LoginScreen = () => {
 
       console.log("✅ Login Google bem-sucedido:", idToken);
 
-      // Troque "localhost" pelo IP da sua máquina caso seja testando no celular
-      fetch("http://localhost:3000/auth/google", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ idToken }),
-      })
+      // Usa a instância do axios configurada com a baseURL correta
+      api.post("/auth/google", { idToken })
         .then(async (res) => {
-          const data = await res.json();
-          if (res.ok && data.token) {
+          const data = res.data;
+          if (res.status === 200 && data.token) {
             console.log("✅ Login backend:", data);
+            await AsyncStorage.setItem('user_token', data.token);
             router.replace("/(home_page)/home_page");
           } else {
             alert(`Erro de autenticação: ${data.error || "Desconhecido"}`);
@@ -97,7 +98,7 @@ const LoginScreen = () => {
         })
         .catch((err) => {
           console.error("Erro no fetch:", err);
-          alert("Erro ao conectar ao servidor de autenticação. Verifique o IP.");
+          alert("Erro ao conectar ao servidor de autenticação.");
         });
     }
   }, [response]);
@@ -145,6 +146,7 @@ const LoginScreen = () => {
               style={styles.loginButton}
               activeOpacity={0.8}
               onPress={handleSubmit}
+              disabled={loading}
             >
               {loading ? (
                 <ActivityIndicator color={colors.white} />

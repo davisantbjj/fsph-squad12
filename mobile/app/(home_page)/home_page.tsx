@@ -16,56 +16,187 @@ import {
   Text,
   TouchableOpacity,
   View,
+  ActivityIndicator
 } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 import { shadows } from "./_shadow"
+import api from "@/src/services/api"
+import AsyncStorage from "@react-native-async-storage/async-storage"
+import { useFocusEffect } from '@react-navigation/native';
 
 export default function Frame116() {
   const router = useRouter()
-  const [local, setLocal] = React.useState("")
-  const [data, setData] = React.useState("")
-  const [hora, setHora] = React.useState("")
-  const [nextAppointment, setNextAppointment] = React.useState<null | {
-    local: string
-    data: string
-    hora: string
-  }>(null)
-  const [showForm, setShowForm] = React.useState(false)
+  const [loading, setLoading] = React.useState(true);
+  const [userInfo, setUserInfo] = React.useState<any>(null);
+  const [estoque, setEstoque] = React.useState<any[]>([]);
+  const [lastEstoqueUpdate, setLastEstoqueUpdate] = React.useState<Date | null>(null);
+  const [nextAppointment, setNextAppointment] = React.useState<any>(null);
+  const [campaigns, setCampaigns] = React.useState<any[]>([]);
+  const [donationsCount, setDonationsCount] = React.useState<number>(0);
+  const [livesSaved, setLivesSaved] = React.useState<number>(0);
+  const [userProgress, setUserProgress] = React.useState<number>(0);
 
-  const handleSchedule = () => {
-    if (!local.trim() || !data.trim() || !hora.trim()) {
-      Alert.alert(
-        "Preencha todos os campos",
-        "Por favor informe local, data e hora para o agendamento."
-      )
-      return
+  // UseFocusEffect para recarregar dados sempre que a tela ganhar foco (ex: voltar do agendamento)
+  useFocusEffect(
+    React.useCallback(() => {
+      loadData();
+    }, [])
+  );
+
+  const loadData = async () => {
+    try {
+        setLoading(true);
+        // 1. Carregar dados do usuário
+        // Tenta pegar do storage primeiro para ser mais rápido, mas idealmente valida token
+        const token = await AsyncStorage.getItem('user_token');
+        if (!token) {
+          // Quando não houver token, redirecionar para splash para recarregar todo o app
+          router.replace('/(login_page)/splash');
+          return;
+        }
+
+        // Busca perfil
+        try {
+            // Backend mount: app.use("/api/users", userRoutes); -> Rota: /me
+            const profileRes = await api.get('/api/users/me');
+            setUserInfo(profileRes.data);
+        } catch (e) {
+            console.log("Erro ao carregar perfil", e);
+        }
+
+        // 2. Carregar Estoque
+        try {
+          // Backend mount: app.use("/api/estoque", estoqueRoutes);
+          const estoqueRes = await api.get('/api/estoque');
+          setEstoque(estoqueRes.data || []);
+          // marca o horário da última atualização localmente
+          setLastEstoqueUpdate(new Date());
+        } catch (e) {
+          console.log("Erro ao carregar estoque", e);
+        }
+
+        // 3. Carregar Agendamentos (pegar o próximo)
+        try {
+            // Backend mount: app.use("/api/appointments", appointmentsRoutes);
+            const apptRes = await api.get('/api/appointments');
+          // Filtra apenas agendamentos futuros ou pendentes
+          const tryParseDate = (val: any) => {
+            if (!val) return null;
+            // If already a Date or number
+            if (val instanceof Date) return val;
+            const asString = String(val);
+            let d = new Date(asString);
+            if (!isNaN(d.getTime())) return d;
+            // Try replacing space with 'T' (common MySQL -> JS issue)
+            d = new Date(asString.replace(' ', 'T'));
+            if (!isNaN(d.getTime())) return d;
+            // Try appending seconds
+            d = new Date(asString.replace(' ', 'T') + ':00');
+            if (!isNaN(d.getTime())) return d;
+            return null;
+          };
+
+          const futureAppts = apptRes.data.filter((a: any) => {
+            const parsed = tryParseDate(a.data_agendamento);
+            return parsed && parsed.getTime() > Date.now() && a.status_agendamento !== 'Cancelado';
+          });
+            // Ordena e pega o primeiro
+            if (futureAppts.length > 0) {
+                // Supondo que o back já retorna ordenado, mas garantindo
+                futureAppts.sort((a: any, b: any) => new Date(a.data_agendamento).getTime() - new Date(b.data_agendamento).getTime());
+
+                const next = futureAppts[0];
+                const dateObj = tryParseDate(next.data_agendamento) || new Date(next.data_agendamento);
+                // Formata data e hora simples
+                setNextAppointment({
+                    local: next.local_agendamento,
+                    data: dateObj.toLocaleDateString('pt-BR'),
+                    hora: dateObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+                });
+            } else {
+                setNextAppointment(null);
+            }
+        } catch (e) {
+             console.log("Erro ao carregar agendamentos", e);
+        }
+
+        // 4. Carregar Campanhas
+        try {
+             // Backend mount: app.use("/api/campaigns", campaignsRoutes);
+             const campaignsRes = await api.get('/api/campaigns');
+             setCampaigns(campaignsRes.data || []);
+        } catch (e) {
+             console.log("Erro ao carregar campanhas", e);
+        }
+
+        // 5. Carregar Histórico do usuário para calcular estatísticas (remover dados mockados)
+        try {
+          const historyRes = await api.get('/api/history');
+          const historyData = historyRes.data || [];
+          const donations = historyData.filter((h: any) => h.origin === 'donation' || h.type === 'Doação Realizada');
+          const donationsNumber = donations.length;
+          // Estimativa simples: cada doação pode salvar ~3 vidas (ajustável se backend fornecer outra métrica)
+          const estimatedLives = donationsNumber * 3;
+          setDonationsCount(donationsNumber);
+          setLivesSaved(estimatedLives);
+          // Try to compute a user progress percent based on ranking top value
+          try {
+            const rankingRes = await api.get('/api/ranking');
+            const ranking = rankingRes.data || [];
+            const max = ranking.length > 0 ? (ranking[0].total_doacoes || ranking[0].total_doacoes === 0 ? Number(ranking[0].total_doacoes) : (ranking[0].total_doacoes ?? 0)) : 0;
+            const userTotal = donationsNumber;
+            const percent = max > 0 ? Math.round((userTotal / max) * 100) : 0;
+            setUserProgress(percent);
+          } catch (e) {
+            // ignore ranking errors, keep default
+            console.log('Erro ao carregar ranking para progresso do usuário', e);
+          }
+        } catch (e) {
+          console.log('Erro ao carregar histórico para stats', e);
+        }
+
+    } catch (error) {
+        console.error("Erro geral no loadData:", error);
+    } finally {
+        setLoading(false);
     }
-
-    setNextAppointment({ local, data, hora })
-    Alert.alert(
-      "Agendamento confirmado",
-      `Local: ${local}\nData: ${data}\nHora: ${hora}`
-    )
-    // limpar campos e fechar formulário
-    setLocal("")
-    setData("")
-    setHora("")
-    setShowForm(false)
-  }
+  };
 
   const Line = () => {
     return <View style={styles.line} />
   }
 
-  const campaigns = [
-    {
-      name: "João Santos",
-      donors: "3/10",
-      bloodTypes: ["A+", "A-", "O+", "O-"],
-    },
-    { name: "Sofia", donors: "45/50", bloodTypes: ["A-", "B-", "AB-", "O-"] },
-    { name: "Simone", donors: "15/30", bloodTypes: [] },
-  ]
+  // Mapeamento de níveis de alerta para texto e cor (simplificado)
+  const normalize = (s?: string) => {
+    if (!s) return '';
+    try {
+      return s.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '').trim();
+    } catch (e) {
+      // fallback for environments without Unicode property escapes
+      return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    }
+  };
+
+  const getAlertLevel = (situacao?: string) => {
+      const key = normalize(situacao);
+      switch(key) {
+          case 'critico':
+          case 'critico': return { text: 'Crítico', color: '#D32F2F' }; // Vermelho
+          case 'alerta': return { text: 'Alerta', color: '#F57C00' };   // Laranja
+          case 'estavel':
+          case 'estavel': return { text: 'Estável', color: '#388E3C' }; // Verde
+          default: return { text: situacao || '---', color: '#999' };
+      }
+  };
+
+  if (loading && !userInfo) {
+      return (
+          <View style={[styles.parent, { justifyContent: 'center', alignItems: 'center' }]}>
+              <ActivityIndicator size="large" color="#D32F2F" />
+          </View>
+      )
+  }
+
   return (
     <SafeAreaView style={styles.parent}>
       <StatusBar barStyle="dark-content" />
@@ -73,20 +204,30 @@ export default function Frame116() {
       <View style={styles.profileContainer}>
         <TouchableOpacity
           activeOpacity={0.8}
-          onPress={() => router.push("/profile" as any)}
+          onPress={() => router.push("/(home_page)/profile_page" as any)}
           style={styles.profileLink}
         >
-          {/* substituir require por imagem do usuário se disponível */}
-          <FontAwesome
-            name="user-circle"
-            size={48}
-            color="#d32f2f"
-            style={styles.profileImage}
-          />
+          {userInfo?.foto_perfil ? (
+              <View style={{ width: 48, height: 48, borderRadius: 24, overflow: 'hidden' }}>
+                {/* Aqui você usaria <Image source={{ uri: userInfo.foto_perfil }} ... /> */}
+                <FontAwesome
+                    name="user-circle"
+                    size={48}
+                    color="#d32f2f"
+                />
+              </View>
+          ) : (
+            <FontAwesome
+                name="user-circle"
+                size={48}
+                color="#d32f2f"
+                style={styles.profileImage}
+            />
+          )}
         </TouchableOpacity>
         <View style={styles.profileInfo}>
           <ThemedText style={styles.profileGreeting}>Olá,</ThemedText>
-          <ThemedText style={styles.profileName}>Usuário</ThemedText>
+          <ThemedText style={styles.profileName}>{userInfo?.nome_completo || "Doador"}</ThemedText>
         </View>
       </View>
 
@@ -102,60 +243,50 @@ export default function Frame116() {
               Vidas humanas precisam de você!
             </Text>
           </View>
+
+          {/* Carousel de Estoque (horizontal) */}
           <View style={[styles.frameGroup, styles.viewFlexBox]}>
-            <View style={styles.frameBorder}>
-              <View style={[styles.vectorParent, styles.vectorFlexBox]}>
-                <FontAwesome6 name="droplet" size={24} color="white" />
-                <Text style={[styles.a, styles.aFlexBox]}>A-</Text>
-              </View>
-              <Line />
-              <View style={[styles.alertaWrapper, styles.wrapperBorder]}>
-                <Text style={styles.alertaTypo}>Alerta</Text>
-              </View>
-            </View>
-            <View style={styles.frameBorder}>
-              <View style={[styles.vectorParent, styles.vectorFlexBox]}>
-                <FontAwesome6 name="droplet" size={24} color="white" />
-                <Text style={[styles.a, styles.aFlexBox]}>B+</Text>
-              </View>
-              <Line />
-              <View style={[styles.alertaWrapper, styles.wrapperBorder]}>
-                <Text style={styles.alertaTypo}>Crítico</Text>
-              </View>
-            </View>
-            <View style={[styles.frameParent2, styles.frameBorder]}>
-              <View style={[styles.vectorContainer, styles.vectorFlexBox]}>
-                <FontAwesome6 name="droplet" size={24} color="white" />
-                <Text style={[styles.a, styles.aFlexBox]}>AB+</Text>
-              </View>
-              <Line />
-              <View style={[styles.emergnciaWrapper, styles.wrapperBorder]}>
-                <Text style={[styles.emergncia, styles.alertaTypo]}>
-                  Emergência
-                </Text>
-              </View>
-            </View>
-            <View style={styles.frameBorder}>
-              <View style={[styles.vectorParent, styles.vectorFlexBox]}>
-                <FontAwesome6 name="droplet" size={24} color="white" />
-                <Text style={[styles.a, styles.aFlexBox]}>B-</Text>
-              </View>
-              <Line />
-              <View style={[styles.alertaWrapper, styles.wrapperBorder]}>
-                <Text style={styles.alertaTypo}>Alerta</Text>
-              </View>
-            </View>
-            <View style={styles.frameBorder}>
-              <View style={[styles.vectorParent, styles.vectorFlexBox]}>
-                <FontAwesome6 name="droplet" size={24} color="white" />
-                <Text style={[styles.a, styles.aFlexBox]}>O-</Text>
-              </View>
-              <Line />
-              <View style={[styles.alertaWrapper, styles.wrapperBorder]}>
-                <Text style={styles.alertaTypo}>Alerta</Text>
-              </View>
-            </View>
+            {estoque.length > 0 ? (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.carouselContent}
+              >
+                {estoque.map((item, index) => {
+                  const alert = getAlertLevel(item.situacao);
+                  // Ajustar fator RH: backend usa 'P'/'N' — mostrar '+' e '-'
+                  let rhSymbol = item.fatorrh;
+                  if (typeof rhSymbol === 'string') {
+                    if (rhSymbol.toUpperCase() === 'P') rhSymbol = '+';
+                    else if (rhSymbol.toUpperCase() === 'N') rhSymbol = '-';
+                  }
+                  return (
+                    <View key={index} style={[styles.frameBorder, styles.carouselItem]}>
+                      <View style={[styles.vectorParent, styles.vectorFlexBox]}>
+                        <FontAwesome6 name="droplet" size={24} color="white" />
+                        <Text style={[styles.a, styles.aFlexBox]}>{item.grupoabo}{rhSymbol}</Text>
+                      </View>
+                      <Line />
+                      <View style={[styles.alertaWrapper, styles.wrapperBorder]}>
+                        <Text style={[styles.alertaTypo, { color: '#FFF' }]}>{alert.text}</Text>
+                      </View>
+                    </View>
+                  )
+                })}
+              </ScrollView>
+            ) : (
+              <Text style={{ color: 'white' }}>Carregando estoque...</Text>
+            )}
           </View>
+        </View>
+
+        {/* Última atualização do estoque (apenas data/hora pequena e clara, sem caixa) */}
+        <View style={styles.updateContainer}>
+          <Text style={styles.updateSmallText}>
+            {lastEstoqueUpdate
+              ? `${lastEstoqueUpdate.toLocaleDateString('pt-BR')} — ${lastEstoqueUpdate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
+              : "—"}
+          </Text>
         </View>
 
         {/* Agendamentos */}
@@ -202,7 +333,8 @@ export default function Frame116() {
               >
                 <View style={styles.statTopRowSmall}>
                   <View style={{ alignItems: "center", marginLeft: 10 }}>
-                    <Text style={styles.statNumber}>2</Text>
+                    {/* Estatísticas carregadas do histórico */}
+                    <Text style={styles.statNumber}>{donationsCount}</Text>
                     <Text style={styles.statSeparator}>Doações</Text>
                   </View>
                   <View style={{ alignItems: "center", marginLeft: 10 }}>
@@ -218,7 +350,7 @@ export default function Frame116() {
                         size={22}
                         color="#d32f2f"
                       />
-                      <Text style={styles.statNumber}>8</Text>
+                      <Text style={styles.statNumber}>{livesSaved}</Text>
                     </View>
                     <Text style={styles.statSeparator}>Vidas salvas</Text>
                   </View>
@@ -253,7 +385,7 @@ export default function Frame116() {
                       </Text>
                     </View>
                     <View style={styles.progressBar}>
-                      <View style={styles.progressFill} />
+                      <View style={[styles.progressFill, { width: `${userProgress}%` }]} />
                     </View>
                   </View>
                 </View>
@@ -266,7 +398,7 @@ export default function Frame116() {
           </ScrollView>
         </View>
 
-        {/* Campanhas (comentado) */}
+        {/* Campanhas */}
         <View style={styles.campaignsContainer}>
           <Text style={styles.sectionTitle}>Campanhas</Text>
           <Text style={styles.campaignsSubtitle}>
@@ -279,32 +411,26 @@ export default function Frame116() {
             style={styles.campaignsScroll}
             contentContainerStyle={styles.campaignsContent}
           >
-            {campaigns.map((campaign, index) => (
-              <View key={index} style={styles.campaignCard}>
-                <View style={styles.campaignHeader}>
-                  <View style={styles.campaignUser}>
-                    <Text style={styles.campaignName}>{campaign.name}</Text>
-                  </View>
-                  <View style={styles.campaignBadge}>
-                    <Text style={styles.campaignBadgeText}>Doadores</Text>
-                  </View>
+            {campaigns.length > 0 ? (
+                campaigns.map((campaign, index) => (
+                <View key={index} style={styles.campaignCard}>
+                    <View style={styles.campaignHeader}>
+                    <View style={styles.campaignUser}>
+                        <Text style={styles.campaignName} numberOfLines={1}>{campaign.nome_campanha}</Text>
+                    </View>
+                    <View style={styles.campaignBadge}>
+                        <Text style={styles.campaignBadgeText}>Urgente</Text>
+                    </View>
+                    </View>
+
+                    <Text style={styles.campaignDonors} numberOfLines={2}>{campaign.descricao}</Text>
+
+                    <Text style={styles.campaignLabel}>{campaign.local_campanha}</Text>
                 </View>
-
-                <Text style={styles.campaignDonors}>{campaign.donors}</Text>
-
-                {campaign.bloodTypes.length > 0 && (
-                  <View style={styles.campaignBloodTypes}>
-                    {campaign.bloodTypes.map((type, idx) => (
-                      <View key={idx} style={styles.campaignBloodType}>
-                        <Text style={styles.campaignBloodTypeText}>{type}</Text>
-                      </View>
-                    ))}
-                  </View>
-                )}
-
-                <Text style={styles.campaignLabel}>Tipo</Text>
-              </View>
-            ))}
+                ))
+            ) : (
+                <Text style={{ paddingHorizontal: 20 }}>Nenhuma campanha ativa no momento.</Text>
+            )}
           </ScrollView>
         </View>
       </ScrollView>
@@ -339,11 +465,13 @@ const styles = StyleSheet.create({
   },
   wrapperBorder: {
     height: "auto",
-    padding: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
     borderStyle: "solid",
     justifyContent: "center",
     alignItems: "center",
     overflow: "hidden",
+    borderRadius: 6,
   },
   frameBorder: {
     height: "90%",
@@ -352,6 +480,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderStyle: "solid",
     overflow: "hidden",
+    width: 72,
+    marginHorizontal: 2,
   },
   alertaTypo: {
     textAlign: "center",
@@ -359,6 +489,7 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontFamily: "Roboto-Bold",
     fontWeight: "700",
+    textTransform: 'uppercase',
   },
   view: {
     width: "100%",
@@ -405,17 +536,27 @@ const styles = StyleSheet.create({
     textAlign: "left",
   },
   frameGroup: {
-    gap: 10,
+    gap: 5,
     width: "100%",
     alignSelf: "stretch",
     flexDirection: "row",
     overflow: "hidden",
     alignItems: "center",
     flex: 1,
+    justifyContent: 'flex-start', // alinhamento sem espaçamento entre itens
+    paddingHorizontal: 5,
+  },
+  carouselContent: {
+    alignItems: 'center',
+    paddingHorizontal: 8,
+  },
+  carouselItem: {
+    width: 76,
+    marginHorizontal: 6,
   },
   vectorParent: {
     height: 54,
-    width: 57,
+    width: '100%', // ajustado
   },
   vectorIcon: {
     width: 17,
@@ -423,7 +564,7 @@ const styles = StyleSheet.create({
     color: "#fff",
   },
   a: {
-    fontSize: 24,
+    fontSize: 18, // reduzido levemente
     fontFamily: "Roboto-Regular",
   },
   alertaWrapper: {
@@ -486,6 +627,18 @@ const styles = StyleSheet.create({
     marginTop: 16,
     width: "90%",
     alignSelf: "center",
+  },
+  updateContainer: {
+    marginTop: 12,
+    width: "90%",
+    alignSelf: "center",
+  },
+  updateSmallText: {
+    fontSize: 12,
+    color: '#9b9b9b',
+    textAlign: 'left',
+    width: '100%',
+    paddingLeft: 8,
   },
   scheduleTitle: {
     fontSize: 16,
@@ -729,7 +882,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   campaignDonors: {
-    fontSize: 20,
+    fontSize: 14,
     fontWeight: "700",
     color: "#333",
     marginBottom: 8,

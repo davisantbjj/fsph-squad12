@@ -1,6 +1,6 @@
-import api, { setAuthToken } from "@/src/services/api";
+import api from "@/src/services/api";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { validateCredentials } from "@/src/services/auth/credentials";
+import { validateCredentials } from "./credentials";
 
 export type GetLoginParams = {
   email: string
@@ -23,8 +23,6 @@ export async function getLogin({ email, senha }: GetLoginParams) {
     if (response.status === 200 && response.data.token) {
       // Armazena o token
       await AsyncStorage.setItem('user_token', response.data.token);
-      // Também configura o header do axios para evitar condições de corrida
-      setAuthToken(response.data.token);
       // Se a API retornar dados do usuário, também seria bom salvar
       // await AsyncStorage.setItem('user_data', JSON.stringify(response.data.user));
       return { success: true };
@@ -42,8 +40,7 @@ export async function getLogin({ email, senha }: GetLoginParams) {
 
 export async function logout() {
     try {
-    await AsyncStorage.removeItem('user_token');
-    setAuthToken(null as any);
+        await AsyncStorage.removeItem('user_token');
         // Limpar outros dados se necessário
     } catch (e) {
         console.error("Erro ao fazer logout", e);

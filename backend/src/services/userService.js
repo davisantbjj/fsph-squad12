@@ -8,10 +8,10 @@ import { getConnection } from "../config/database.js";
 async function findOrCreateUserByGoogleId(googleProfile) {
   const { sub: google_id, name: nome_completo, email, picture: foto_perfil } = googleProfile;
 
-  const connection = await getConnection();
+  const pool = await getConnection();
   try {
     // 1. Tenta encontrar o usuário pelo google_id
-    let [rows] = await connection.query(
+    let [rows] = await pool.query(
       "SELECT * FROM usuarios WHERE google_id = ?",
       [google_id]
     );
@@ -29,7 +29,7 @@ async function findOrCreateUserByGoogleId(googleProfile) {
         status_ativo: true, // Define o usuário como ativo por padrão
       };
 
-      const [result] = await connection.query(
+      const [result] = await pool.query(
         "INSERT INTO usuarios SET ?",
         newUser
       );
@@ -40,23 +40,19 @@ async function findOrCreateUserByGoogleId(googleProfile) {
   } catch (error) {
     console.error("Erro no serviço de usuário (findOrCreate):", error);
     throw error; // Propaga o erro para ser tratado no controller
-  } finally {
-    if (connection) {
-      await connection.end();
-    }
   }
 }
 
 async function createUser(userData) {
   const { nome_completo, email, senha } = userData;
-  const connection = await getConnection();
+  const pool = await getConnection();
   try {
     const newUser = {
       nome_completo,
       email,
       senha, // Lembre-se que a senha já deve vir com hash
     };
-    const [result] = await connection.query(
+    const [result] = await pool.query(
       "INSERT INTO usuarios SET ?",
       newUser
     );
@@ -65,15 +61,13 @@ async function createUser(userData) {
   } catch (error) {
     console.error("Erro ao criar usuário:", error);
     throw error;
-  } finally {
-    if (connection) await connection.end();
   }
 }
 
 async function findUserByEmail(email) {
-  const connection = await getConnection();
+  const pool = await getConnection();
   try {
-    const [rows] = await connection.query(
+    const [rows] = await pool.query(
       "SELECT * FROM usuarios WHERE email = ?",
       [email]
     );
@@ -81,15 +75,13 @@ async function findUserByEmail(email) {
   } catch (error) {
     console.error("Erro ao buscar usuário por email:", error);
     throw error;
-  } finally {
-    if (connection) await connection.end();
   }
 }
 
 async function findUserById(id) {
-  const connection = await getConnection();
+  const pool = await getConnection();
   try {
-    const [rows] = await connection.query(
+    const [rows] = await pool.query(
       "SELECT * FROM usuarios WHERE id_usuario = ?",
       [id]
     );
@@ -97,35 +89,30 @@ async function findUserById(id) {
   } catch (error) {
     console.error("Erro ao buscar usuário por ID:", error);
     throw error;
-  } finally {
-    if (connection) await connection.end();
   }
 }
 
 async function updateUserById(id, updateData) {
-  let connection; // Declarado aqui para ser acessível no finally
   try {
-    connection = await getConnection();
+    const pool = await getConnection();
     // Garante que o objeto de atualização não esteja vazio
     if (Object.keys(updateData).length === 0) {
       // Reutiliza a conexão existente para buscar o usuário
-      const [rows] = await connection.query("SELECT * FROM usuarios WHERE id_usuario = ?", [id]);
+      const [rows] = await pool.query("SELECT * FROM usuarios WHERE id_usuario = ?", [id]);
       return rows.length > 0 ? rows[0] : null;
     }
 
-    await connection.query("UPDATE usuarios SET ? WHERE id_usuario = ?", [
+    await pool.query("UPDATE usuarios SET ? WHERE id_usuario = ?", [
       updateData,
       id,
     ]);
 
     // Reutiliza a conexão para buscar o usuário atualizado
-    const [rows] = await connection.query("SELECT * FROM usuarios WHERE id_usuario = ?", [id]);
+    const [rows] = await pool.query("SELECT * FROM usuarios WHERE id_usuario = ?", [id]);
     return rows.length > 0 ? rows[0] : null;
   } catch (error) {
     console.error("Erro ao atualizar usuário por ID:", error);
     throw error;
-  } finally {
-    if (connection) await connection.end();
   }
 }
 
