@@ -485,7 +485,7 @@ const styles = StyleSheet.create({
   },
   alertaTypo: {
     textAlign: "center",
-    fontSize: 14,
+    fontSize: 10, // reduzido para caber
     color: "#fff",
     fontFamily: "Roboto-Bold",
     fontWeight: "700",
