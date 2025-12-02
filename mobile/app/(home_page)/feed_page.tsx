@@ -16,6 +16,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from 'expo-router';
+import { ThemedText } from "@/components/ThemedText";
 
 interface Post {
   id: string;
@@ -30,6 +31,7 @@ interface Post {
 
 export default function FeedPage() {
   const [posts, setPosts] = useState<Post[]>([]);
+  const [userInfo, setUserInfo] = React.useState<any>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
   const [showOptionsModal, setShowOptionsModal] = useState(false);
@@ -132,11 +134,13 @@ export default function FeedPage() {
       {/* Header do Post */}
       <View style={styles.postHeader}>
         <View style={styles.userInfo}>
-          <Image 
-            source={{ uri: post.avatar || 'https://via.placeholder.com/40' }} 
+          <Image
+            source={{ uri: post.avatar || "https://via.placeholder.com/40" }}
             style={styles.avatar}
           />
-          <Text style={styles.username}>{post.usuario}</Text>
+          <ThemedText style={styles.username}>
+            {userInfo?.nome_completo || "Doador"}
+          </ThemedText>
         </View>
         <TouchableOpacity onPress={() => openOptionsMenu(post.id)}>
           <Ionicons name="ellipsis-vertical" size={20} color="#666" />
@@ -144,22 +148,22 @@ export default function FeedPage() {
       </View>
 
       {/* Imagem do Post */}
-      <Image 
-        source={{ uri: post.imagem }} 
+      <Image
+        source={{ uri: post.imagem }}
         style={styles.postImage}
         resizeMode="cover"
       />
 
       {/* Ações (Like) */}
       <View style={styles.actionsContainer}>
-        <TouchableOpacity 
+        <TouchableOpacity
           onPress={() => toggleLike(post.id)}
           style={styles.actionButton}
         >
-          <Ionicons 
-            name={post.liked ? "heart" : "heart-outline"} 
-            size={28} 
-            color={post.liked ? "#DC2626" : "#333"} 
+          <Ionicons
+            name={post.liked ? "heart" : "heart-outline"}
+            size={28}
+            color={post.liked ? "#DC2626" : "#333"}
           />
         </TouchableOpacity>
       </View>
@@ -168,12 +172,14 @@ export default function FeedPage() {
       <View style={styles.captionContainer}>
         <Text style={styles.likesText}>{post.likes} curtidas</Text>
         <Text style={styles.caption}>
-          <Text style={styles.username}>{post.usuario} </Text>
+          <ThemedText style={styles.username}>
+            {userInfo?.nome_completo || "Doador"} {" "}
+          </ThemedText>
           {post.legenda}
         </Text>
       </View>
     </View>
-  );
+  )
 
   return (
     <SafeAreaView style={styles.container}>
