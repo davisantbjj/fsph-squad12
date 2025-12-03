@@ -196,6 +196,7 @@ export default function Frame116() {
           </View>
       )
   }
+  const isStatus = false;
 
   return (
     <SafeAreaView style={styles.parent}>
@@ -204,30 +205,35 @@ export default function Frame116() {
       <View style={styles.profileContainer}>
         <TouchableOpacity
           activeOpacity={0.8}
-          onPress={() => router.push("/(home_page)/profile_page" as any)}
+          onPress={() => router.replace("/(home_page)/profile_page" as any)}
           style={styles.profileLink}
         >
           {userInfo?.foto_perfil ? (
-              <View style={{ width: 48, height: 48, borderRadius: 24, overflow: 'hidden' }}>
-                {/* Aqui você usaria <Image source={{ uri: userInfo.foto_perfil }} ... /> */}
-                <FontAwesome
-                    name="user-circle"
-                    size={48}
-                    color="#d32f2f"
-                />
-              </View>
+            <View
+              style={{
+                width: 48,
+                height: 48,
+                borderRadius: 24,
+                overflow: "hidden",
+              }}
+            >
+              {/* Aqui você usaria <Image source={{ uri: userInfo.foto_perfil }} ... /> */}
+              <FontAwesome name="user-circle" size={48} color="#d32f2f" />
+            </View>
           ) : (
             <FontAwesome
-                name="user-circle"
-                size={48}
-                color="#d32f2f"
-                style={styles.profileImage}
+              name="user-circle"
+              size={48}
+              color="#d32f2f"
+              style={styles.profileImage}
             />
           )}
         </TouchableOpacity>
         <View style={styles.profileInfo}>
           <ThemedText style={styles.profileGreeting}>Olá,</ThemedText>
-          <ThemedText style={styles.profileName}>{userInfo?.nome_completo || "Doador"}</ThemedText>
+          <ThemedText style={styles.profileName}>
+            {userInfo?.nome_completo || "Doador"}
+          </ThemedText>
         </View>
       </View>
 
@@ -253,73 +259,135 @@ export default function Frame116() {
                 contentContainerStyle={styles.carouselContent}
               >
                 {estoque.map((item, index) => {
-                  const alert = getAlertLevel(item.situacao);
+                  const alert = getAlertLevel(item.situacao)
                   // Ajustar fator RH: backend usa 'P'/'N' — mostrar '+' e '-'
-                  let rhSymbol = item.fatorrh;
-                  if (typeof rhSymbol === 'string') {
-                    if (rhSymbol.toUpperCase() === 'P') rhSymbol = '+';
-                    else if (rhSymbol.toUpperCase() === 'N') rhSymbol = '-';
+                  let rhSymbol = item.fatorrh
+                  if (typeof rhSymbol === "string") {
+                    if (rhSymbol.toUpperCase() === "P") rhSymbol = "+"
+                    else if (rhSymbol.toUpperCase() === "N") rhSymbol = "-"
                   }
                   return (
-                    <View key={index} style={[styles.frameBorder, styles.carouselItem]}>
+                    <View
+                      key={index}
+                      style={[styles.frameBorder, styles.carouselItem]}
+                    >
                       <View style={[styles.vectorParent, styles.vectorFlexBox]}>
                         <FontAwesome6 name="droplet" size={24} color="white" />
-                        <Text style={[styles.a, styles.aFlexBox]}>{item.grupoabo}{rhSymbol}</Text>
+                        <Text style={[styles.a, styles.aFlexBox]}>
+                          {item.grupoabo}
+                          {rhSymbol}
+                        </Text>
                       </View>
                       <Line />
-                      <View style={[styles.alertaWrapper, styles.wrapperBorder]}>
-                        <Text style={[styles.alertaTypo, { color: '#FFF' }]}>{alert.text}</Text>
+                      <View
+                        style={[styles.alertaWrapper, styles.wrapperBorder]}
+                      >
+                        <Text style={[styles.alertaTypo, { color: "#FFF" }]}>
+                          {alert.text}
+                        </Text>
                       </View>
                     </View>
                   )
                 })}
               </ScrollView>
             ) : (
-              <Text style={{ color: 'white' }}>Carregando estoque...</Text>
+              <Text style={{ color: "white" }}>Carregando estoque...</Text>
             )}
           </View>
         </View>
 
         {/* Última atualização do estoque (apenas data/hora pequena e clara, sem caixa) */}
-        <View style={styles.updateContainer}>
+        <View style={[styles.updateContainer]}>
           <Text style={styles.updateSmallText}>
+            Última atualização do estoque:{" "}
             {lastEstoqueUpdate
-              ? `${lastEstoqueUpdate.toLocaleDateString('pt-BR')} — ${lastEstoqueUpdate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
+              ? `${lastEstoqueUpdate.toLocaleDateString(
+                  "pt-BR"
+                )} — ${lastEstoqueUpdate.toLocaleTimeString("pt-BR", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}`
               : "—"}
           </Text>
         </View>
 
         {/* Agendamentos */}
-        <View style={styles.scheduleContainer}>
-          <View style={styles.card}>
-            <View style={styles.cardTitleContainer}>
+        {isStatus ? (
+          <View style={styles.scheduleContainer}>
+            <View style={[styles.card, shadows.md, styles.appointmentCard]}>
               <Text style={styles.cardTitle}>Seu próximo agendamento</Text>
-            </View>
-            <View style={styles.cardContent}>
-              <Text style={styles.cardText}>
-                {nextAppointment
-                  ? `${nextAppointment.local} — ${nextAppointment.data} às ${nextAppointment.hora}`
-                  : "Sem agendamentos próximos"}
+              <Text style={styles.appointmentDate}>
+                Sexta-feira, 3 de Outubro
               </Text>
-              <TouchableOpacity
-                style={styles.cardButton}
-                onPress={() => {
-                  console.log("navegando para scheduling")
-                  router.push("/(others_page)/scheduling" as any)
-                }}
-                activeOpacity={0.9}
-              >
-                <Text style={styles.cardButtonText}>Agendar</Text>
-              </TouchableOpacity>
+              <Text style={styles.appointmentTime}>às 10:30</Text>
+              <View style={styles.appointmentLocationRow}>
+                <Ionicons name="location-outline" size={16} color="#999" />
+                <Text style={styles.appointmentLocationText}>
+                  Hemocentro de Sergipe
+                </Text>
+              </View>
+
+              <View style={styles.appointmentActions}>
+                <TouchableOpacity
+                  style={[styles.outlineButton, { marginRight: 8 }]}
+                  activeOpacity={0.9}
+                  onPress={() =>
+                    router.push("/(others_page)/history_page" as any)
+                  }
+                >
+                  <Text style={styles.outlineButtonText}>Ver detalhes</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.outlineButton}
+                  activeOpacity={0.9}
+                  onPress={() =>
+                    Alert.alert(
+                      "Remarcar/Cancelar",
+                      "Implementar fluxo de remarcar ou cancelar."
+                    )
+                  }
+                >
+                  <Text style={styles.outlineButtonText}>
+                    Remarcar / Cancelar
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
-        </View>
+        ) : (
+          <View style={styles.scheduleContainer}>
+            <View style={[styles.card, shadows.md]}>
+              <View style={styles.cardTitleContainer}>
+                <Text style={styles.cardTitle}>Seu próximo agendamento</Text>
+              </View>
+              <View style={styles.cardContent}>
+                <Text style={styles.cardText}>
+                  {nextAppointment
+                    ? `${nextAppointment.local} — ${nextAppointment.data} às ${nextAppointment.hora}`
+                    : "Sem agendamentos próximos"}
+                </Text>
+                <TouchableOpacity
+                  style={styles.cardButton}
+                  onPress={() => {
+                    console.log("navegando para scheduling")
+                    router.push("/(others_page)/scheduling" as any)
+                  }}
+                  activeOpacity={0.9}
+                >
+                  <Text style={styles.cardButtonText}>Agendar</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        )}
 
         {/* Seu Impacto */}
         <View style={styles.impactContainer}>
           <Text style={styles.impactHeader}>Seu Impacto</Text>
           <ScrollView
             horizontal
+            nestedScrollEnabled={true}
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.impactScroll}
           >
@@ -371,21 +439,28 @@ export default function Frame116() {
                   <View
                     style={{
                       alignItems: "center",
+                      marginRight: 10,
                     }}
                   >
                     <Ionicons name="trophy-outline" size={30} color="#b71c1c" />
                   </View>
                   <View>
-                    <View style={{ marginLeft: 10, flex: 1 }}>
-                      <Text style={styles.statSmallTitle}>Vamos lá!</Text>
+                    <View style={{ width: "100%" }}>
+                      {/* <Text style={styles.statSmallTitle}>Vamos lá!</Text> */}
                       <Text style={styles.statSmallSubtitle}>
+                        Vamos lá!{"\n"}
                         Seja uma{" "}
                         <Text style={{ fontWeight: "700" }}>heroína</Text>
                         {"\n"}E salve mais uma vida.
                       </Text>
                     </View>
                     <View style={styles.progressBar}>
-                      <View style={[styles.progressFill, { width: `${userProgress}%` }]} />
+                      <View
+                        style={[
+                          styles.progressFill,
+                          { width: `${userProgress}%` },
+                        ]}
+                      />
                     </View>
                   </View>
                 </View>
@@ -399,8 +474,8 @@ export default function Frame116() {
         </View>
 
         {/* Campanhas */}
-        <View style={styles.campaignsContainer}>
-          <Text style={styles.sectionTitle}>Campanhas</Text>
+        <View style={styles.impactContainer}>
+          <Text style={styles.impactHeader}>Campanhas</Text>
           <Text style={styles.campaignsSubtitle}>
             Essas pessoas estão precisando de você!
           </Text>
@@ -412,24 +487,32 @@ export default function Frame116() {
             contentContainerStyle={styles.campaignsContent}
           >
             {campaigns.length > 0 ? (
-                campaigns.map((campaign, index) => (
+              campaigns.map((campaign, index) => (
                 <View key={index} style={styles.campaignCard}>
-                    <View style={styles.campaignHeader}>
+                  <View style={styles.campaignHeader}>
                     <View style={styles.campaignUser}>
-                        <Text style={styles.campaignName} numberOfLines={1}>{campaign.nome_campanha}</Text>
+                      <Text style={styles.campaignName} numberOfLines={1}>
+                        {campaign.nome_campanha}
+                      </Text>
                     </View>
                     <View style={styles.campaignBadge}>
-                        <Text style={styles.campaignBadgeText}>Urgente</Text>
+                      <Text style={styles.campaignBadgeText}>Urgente</Text>
                     </View>
-                    </View>
+                  </View>
 
-                    <Text style={styles.campaignDonors} numberOfLines={2}>{campaign.descricao}</Text>
+                  <Text style={styles.campaignDonors} numberOfLines={2}>
+                    {campaign.descricao}
+                  </Text>
 
-                    <Text style={styles.campaignLabel}>{campaign.local_campanha}</Text>
+                  <Text style={styles.campaignLabel}>
+                    {campaign.local_campanha}
+                  </Text>
                 </View>
-                ))
+              ))
             ) : (
-                <Text style={{ paddingHorizontal: 20 }}>Nenhuma campanha ativa no momento.</Text>
+              <Text style={{ paddingHorizontal: 20 }}>
+                Nenhuma campanha ativa no momento.
+              </Text>
             )}
           </ScrollView>
         </View>
@@ -474,22 +557,25 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   frameBorder: {
-    height: "90%",
-    borderRadius: 12,
+    minWidth: 60,
+    height: "94%",
+    alignItems: "center",
+    backgroundColor: "#d32f2f",
+    borderRadius: 10,
     borderColor: "rgba(218, 218, 218, 0.3)",
     borderWidth: 1,
     borderStyle: "solid",
     overflow: "hidden",
-    width: 72,
-    marginHorizontal: 2,
+    marginRight: 12,
+    paddingVertical: 8,
   },
   alertaTypo: {
     textAlign: "center",
-    fontSize: 14,
+    fontSize: 10, // reduzido para caber
     color: "#fff",
     fontFamily: "Roboto-Bold",
     fontWeight: "700",
-    textTransform: 'uppercase',
+    textTransform: "uppercase",
   },
   view: {
     width: "100%",
@@ -543,11 +629,11 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     alignItems: "center",
     flex: 1,
-    justifyContent: 'flex-start', // alinhamento sem espaçamento entre itens
+    justifyContent: "flex-start", // alinhamento sem espaçamento entre itens
     paddingHorizontal: 5,
   },
   carouselContent: {
-    alignItems: 'center',
+    alignItems: "center",
     paddingHorizontal: 8,
   },
   carouselItem: {
@@ -556,7 +642,7 @@ const styles = StyleSheet.create({
   },
   vectorParent: {
     height: 54,
-    width: '100%', // ajustado
+    width: "100%", // ajustado
   },
   vectorIcon: {
     width: 17,
@@ -629,15 +715,17 @@ const styles = StyleSheet.create({
     alignSelf: "center",
   },
   updateContainer: {
-    marginTop: 12,
     width: "90%",
+    height: 16,
     alignSelf: "center",
+    borderBottomEndRadius: 4,
+    borderBottomStartRadius: 4,
   },
   updateSmallText: {
     fontSize: 12,
-    color: '#9b9b9b',
-    textAlign: 'left',
-    width: '100%',
+    color: "#9b9b9b",
+    textAlign: "right",
+    width: "100%",
     paddingLeft: 8,
   },
   scheduleTitle: {
@@ -750,9 +838,11 @@ const styles = StyleSheet.create({
   },
   impactCardWrapper: {
     marginRight: 12,
+    flex: 1,
   },
   statCard: {
-    //flexBasis: "48%",
+    flexBasis: "48%",
+    height: 140,
     minWidth: 140,
     backgroundColor: "#fff",
     borderRadius: 12,
@@ -765,6 +855,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     marginBottom: 8,
+    width: "auto",
+    height: "60%",
   },
   statNumber: {
     fontSize: 28,
@@ -796,8 +888,10 @@ const styles = StyleSheet.create({
   },
   statTopRow: {
     flexDirection: "row",
+    width: "auto",
     alignItems: "center",
     marginBottom: 8,
+    height: "auto",
   },
   statSmallTitle: {
     fontSize: 14,
@@ -821,15 +915,13 @@ const styles = StyleSheet.create({
     height: "100%",
     backgroundColor: "#d32f2f",
   },
-  campaignsContainer: {
-    marginTop: "auto",
-    paddingHorizontal: "4%",
-    marginBottom: "auto",
-  },
+
   campaignsSubtitle: {
     fontSize: 14,
     color: "#666",
     marginBottom: 16,
+    fontFamily: "Roboto-Regular",
+    padding: 4,
   },
   campaignsScroll: {
     marginHorizontal: -20,
@@ -841,10 +933,11 @@ const styles = StyleSheet.create({
   },
   campaignCard: {
     width: 160,
+    height: 200,
     backgroundColor: "#FFF",
     borderRadius: 12,
     padding: 16,
-    shadowColor: "#000",
+    shadowColor: "#d32f2f",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 6,
@@ -877,12 +970,13 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   campaignBadgeText: {
-    fontSize: 8,
+    fontSize: 11,
     color: "#DC2626",
     fontWeight: "600",
+    fontFamily: "Roboto",
   },
   campaignDonors: {
-    fontSize: 14,
+    fontSize: 20,
     fontWeight: "700",
     color: "#333",
     marginBottom: 8,
@@ -900,12 +994,13 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   campaignBloodTypeText: {
-    fontSize: 10,
+    fontSize: 11,
     color: "#DC2626",
     fontWeight: "600",
   },
   campaignLabel: {
-    fontSize: 10,
+    fontSize: 11,
+    fontFamily: "Roboto",
     color: "#999",
     marginTop: 4,
   },
@@ -914,5 +1009,47 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#333",
     marginBottom: 16,
+  },
+  appointmentCard: {
+    padding: 16,
+  },
+  appointmentSmallTitle: {
+    fontSize: 14,
+  },
+  appointmentDate: {
+    fontSize: 18,
+    fontWeight: "700",
+  },
+  appointmentTime: {
+    fontSize: 16,
+    color: "#555",
+  },
+  appointmentLocationRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  appointmentLocationText: {
+    fontSize: 14,
+    color: "#999",
+    marginLeft: 4,
+  },
+  appointmentActions: {
+    flexDirection: "row",
+    marginTop: 12,
+  },
+  outlineButton: {
+    flex: 1,
+    width: "100%",
+    borderWidth: 1.3,
+    borderColor: "#d32f2f",
+    borderRadius: 30,
+    paddingVertical: 5,
+    paddingBottom: 6,
+    alignItems: "center",
+  },
+  outlineButtonText: {
+    color: "#d32f2f",
+    fontFamily: "Roboto-Bold",
+    fontSize: 14,
   },
 })
