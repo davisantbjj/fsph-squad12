@@ -1,14 +1,14 @@
 // shadow.js
 import { Platform } from "react-native"
 
-const iosShadow = (elevation, color = "#000") => ({
+const iosShadow = (elevation, color = "#d32f2f") => ({
   shadowColor: color,
   shadowOffset: { width: 0, height: elevation * 0.6 },
   shadowOpacity: 0.25,
   shadowRadius: elevation * 0.8,
 })
 
-const androidShadow = (elevation, color = "#000000ff") => ({
+const androidShadow = (elevation, color = "#d32f2f") => ({
   elevation,
   shadowColor: color, // funciona melhor no Android 9+
 })
