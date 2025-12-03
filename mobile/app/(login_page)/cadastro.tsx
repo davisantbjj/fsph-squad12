@@ -41,7 +41,6 @@ const fonts = {
 
 // Imports das Logos
 const googleLogo: ImageSourcePropType = require("@/assets/images/google-logo.png")
-const facebookLogo: ImageSourcePropType = require("@/assets/images/facebook-logo.png")
 
 const CadastroScreen = () => {
   const router = useRouter()
@@ -252,10 +251,7 @@ const CadastroScreen = () => {
               <Image source={googleLogo} style={styles.socialLogo} />
               <Text style={styles.socialButtonText}>Google</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.socialButton}>
-              <Image source={facebookLogo} style={styles.socialLogo} />
-              <Text style={styles.socialButtonText}>Facebook</Text>
-            </TouchableOpacity>
+            {/* Facebook removido: apenas Google permanece */}
           </View>
 
           <Text style={styles.termsText}>

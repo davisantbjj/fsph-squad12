@@ -16,7 +16,8 @@ import {
   Text,
   TouchableOpacity,
   View,
-  ActivityIndicator
+  ActivityIndicator,
+  Image,
 } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 import { shadows } from "./_shadow"
@@ -209,17 +210,10 @@ export default function Frame116() {
           style={styles.profileLink}
         >
           {userInfo?.foto_perfil ? (
-            <View
-              style={{
-                width: 48,
-                height: 48,
-                borderRadius: 24,
-                overflow: "hidden",
-              }}
-            >
-              {/* Aqui você usaria <Image source={{ uri: userInfo.foto_perfil }} ... /> */}
-              <FontAwesome name="user-circle" size={48} color="#d32f2f" />
-            </View>
+            <Image
+              source={{ uri: userInfo.foto_perfil }}
+              style={{ width: 48, height: 48, borderRadius: 24 }}
+            />
           ) : (
             <FontAwesome
               name="user-circle"

@@ -1,7 +1,7 @@
 import { EvilIcons, Feather } from "@expo/vector-icons"
 import { useRouter } from "expo-router"
 import * as React from "react"
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import {
   LayoutAnimation,
   Platform,
@@ -14,8 +14,10 @@ import {
   View,
   Modal,
   Dimensions, // Importado para cálculo de largura do calendário
+  Alert,
 } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
+import api from "@/src/services/api"
 
 // Habilita animação de layout no Android
 if (
@@ -243,8 +245,62 @@ export default function SchedulingPage() {
       setOpenVerif(true)
       return
     }
-    if (openVerif) {
-      console.log("Fluxo finalizado e Agendamento Confirmado!")
+      if (openVerif) {
+        // Ao confirmar, envia para o backend e navega após sucesso
+        submitAppointment()
+        return
+      }
+  }
+
+  // Estado de envio
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // Envia o agendamento para o backend
+  const submitAppointment = async () => {
+    if (isSubmitting) return
+    setIsSubmitting(true)
+    try {
+      // Monta data_agendamento: usa a primeira hora do bloco (antes do ' - ')
+      if (!selectedDate || !selectedTime) {
+        Alert.alert('Erro', 'Data e horário inválidos.')
+        setIsSubmitting(false)
+        return
+      }
+      const timePart = selectedTime.split(' - ')[0] || selectedTime
+      // backend aceita vários formatos; usamos 'YYYY-MM-DD HH:MM:SS'
+      const data_agendamento = `${selectedDate} ${timePart}:00`
+
+      const payload: any = {
+        data_agendamento,
+        tipo_agendamento: selected,
+        local_agendamento: selectedLocal,
+        donor_info: {
+          nome_completo: nome || null,
+          cpf: cpf ? String(cpf).replace(/\D/g, '') : null,
+          telefone: telefone ? String(telefone).replace(/\D/g, '') : null,
+          email: email || null,
+          data_nascimento: dataNascimento || null,
+        },
+        pre_triagem: {
+          perguntas_respostas: selectedPreAnswers || {},
+        },
+      }
+
+      const res = await api.post('/api/appointments', payload)
+      if (res && (res.status === 201 || res.status === 200)) {
+        Alert.alert('Agendamento confirmado', 'Seu agendamento foi confirmado com sucesso.', [
+          { text: 'OK', onPress: () => router.replace('/(home_page)/home_page') },
+        ])
+      } else {
+        console.warn('Resposta inesperada ao criar agendamento', res)
+        Alert.alert('Erro', 'Não foi possível confirmar o agendamento. Tente novamente.')
+      }
+    } catch (e: any) {
+      console.error('Erro ao enviar agendamento', e)
+      const msg = e?.response?.data?.error || e?.message || 'Erro interno'
+      Alert.alert('Erro', msg)
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -321,6 +377,31 @@ export default function SchedulingPage() {
   const handlePhoneChange = (text: string) => {
     setTelefone(formatNumber(text))
   }
+
+  // Carrega perfil do usuário para pré-preencher os campos do doador
+  useEffect(() => {
+    const loadProfileForScheduling = async () => {
+      try {
+        const response = await api.get('/api/users/me')
+        const user = response.data || {}
+        if (!cpf && user.cpf) setCpf(formatCPF(user.cpf || ""))
+        if (!nome && user.nome_completo) setNome(user.nome_completo)
+        if (!dataNascimento && user.data_nascimento) {
+          const d = new Date(user.data_nascimento)
+          const formatted = d.toLocaleDateString('pt-BR')
+          setDataNascimento(
+            formatted !== 'Invalid Date' ? formatted : user.data_nascimento
+          )
+        }
+        if (!email && user.email) setEmail(user.email)
+        if (!telefone && user.telefone) setTelefone(user.telefone ? formatNumber(user.telefone) : '')
+      } catch (error) {
+        console.error('Erro ao carregar perfil para pré-preenchimento', error)
+      }
+    }
+
+    loadProfileForScheduling()
+  }, [])
 
   const options = [
     { id: "individual", label: "Doação de Sangue Individual" },
@@ -677,15 +758,8 @@ export default function SchedulingPage() {
         <View style={[styles.page]}>
           {/* 1. Tipo de agendamento */}
           <View style={styles.card}>
-            <TouchableOpacity
+            <View
               style={styles.cardHeader}
-              onPress={() => {
-                LayoutAnimation.configureNext(
-                  LayoutAnimation.Presets.easeInEaseOut
-                )
-                setOpen((s) => !s)
-              }}
-              activeOpacity={0.8}
             >
               <Text style={styles.cardTitle}>Tipo de agendamento</Text>
               <EvilIcons
@@ -693,7 +767,7 @@ export default function SchedulingPage() {
                 size={35}
                 color={selected ? "#d32f2f" : "#bdbdbd"}
               />
-            </TouchableOpacity>
+            </View>
 
             {open && (
               <View style={styles.cardBody}>
@@ -736,16 +810,8 @@ export default function SchedulingPage() {
 
           {/* 2. Pré-Triagem */}
           <View style={styles.card}>
-            <TouchableOpacity
+            <View
               style={styles.cardHeader}
-              onPress={() => {
-                if (!selected) return
-                LayoutAnimation.configureNext(
-                  LayoutAnimation.Presets.easeInEaseOut
-                )
-                setOpenPre((s) => !s)
-              }}
-              activeOpacity={0.8}
             >
               <Text style={styles.cardTitle}>Pré-Triagem</Text>
               <EvilIcons
@@ -753,7 +819,7 @@ export default function SchedulingPage() {
                 size={28}
                 color={isPreTriageValid ? "#d32f2f" : "#bdbdbd"}
               />
-            </TouchableOpacity>
+            </View>
             {openPre && (
               <View style={styles.cardBody}>
                 <PreTriageQuestions />
@@ -763,16 +829,8 @@ export default function SchedulingPage() {
 
           {/* 3. Dados do Doador */}
           <View style={styles.card}>
-            <TouchableOpacity
+            <View
               style={styles.cardHeader}
-              onPress={() => {
-                if (!isPreTriageValid) return
-                LayoutAnimation.configureNext(
-                  LayoutAnimation.Presets.easeInEaseOut
-                )
-                setOpenDados((s) => !s)
-              }}
-              activeOpacity={0.8}
             >
               <Text style={styles.cardTitle}>Dados do Doador</Text>
               <EvilIcons
@@ -780,7 +838,7 @@ export default function SchedulingPage() {
                 size={28}
                 color={isDonorDataValid ? "#d32f2f" : "#bdbdbd"}
               />
-            </TouchableOpacity>
+            </View>
             {openDados && (
               <View style={styles.cardBody}>
                 <Text style={styles.label}>CPF</Text>
@@ -842,16 +900,8 @@ export default function SchedulingPage() {
 
           {/* 4. Local de Doação */}
           <View style={styles.card}>
-            <TouchableOpacity
+            <View
               style={styles.cardHeader}
-              onPress={() => {
-                if (!isDonorDataValid) return
-                LayoutAnimation.configureNext(
-                  LayoutAnimation.Presets.easeInEaseOut
-                )
-                setOpenLocal((s) => !s)
-              }}
-              activeOpacity={0.8}
             >
               <Text style={styles.cardTitle}>Local de Doação</Text>
               <EvilIcons
@@ -859,7 +909,7 @@ export default function SchedulingPage() {
                 size={28}
                 color={isLocationValid ? "#d32f2f" : "#bdbdbd"}
               />
-            </TouchableOpacity>
+            </View>
             {openLocal && (
               <View style={styles.cardBody}>
                 <Text style={styles.label}>Cidades</Text>
@@ -952,16 +1002,8 @@ export default function SchedulingPage() {
 
           {/* 5. Data e Hora */}
           <View style={styles.card}>
-            <TouchableOpacity
+            <View
               style={styles.cardHeader}
-              onPress={() => {
-                if (!isLocationValid) return
-                LayoutAnimation.configureNext(
-                  LayoutAnimation.Presets.easeInEaseOut
-                )
-                setOpenDataHora((s) => !s)
-              }}
-              activeOpacity={0.8}
             >
               <Text style={styles.cardTitle}>Data e Hora</Text>
               <EvilIcons
@@ -969,22 +1011,14 @@ export default function SchedulingPage() {
                 size={28}
                 color={isDateTimeValid ? "#d32f2f" : "#bdbdbd"}
               />
-            </TouchableOpacity>
+            </View>
             {openDataHora && <DateTimeCard />}
           </View>
 
           {/* 6. Verificações Finais */}
           <View style={styles.card}>
-            <TouchableOpacity
+            <View
               style={styles.cardHeader}
-              onPress={() => {
-                if (!isDateTimeValid) return
-                LayoutAnimation.configureNext(
-                  LayoutAnimation.Presets.easeInEaseOut
-                )
-                setOpenVerif((s) => !s)
-              }}
-              activeOpacity={0.8}
             >
               <Text style={styles.cardTitle}>Verificações Finais</Text>
               <EvilIcons
@@ -992,7 +1026,7 @@ export default function SchedulingPage() {
                 size={28}
                 color="#bdbdbd"
               />
-            </TouchableOpacity>
+            </View>
             {openVerif && (
               <View style={styles.cardBody}>
                 <Text style={styles.instruction}>
@@ -1023,10 +1057,10 @@ export default function SchedulingPage() {
             !isAdvanceEnabled && styles.nextButtonDisabled,
           ]}
           onPress={goToNext}
-          disabled={!isAdvanceEnabled}
+          disabled={!isAdvanceEnabled || isSubmitting}
         >
           <Text style={styles.advanceFooterText}>
-            {openVerif ? "Confirmar Agendamento" : "Avançar"}
+            {isSubmitting && openVerif ? 'Enviando...' : openVerif ? "Confirmar Agendamento" : "Avançar"}
           </Text>
         </TouchableOpacity>
       </View>
