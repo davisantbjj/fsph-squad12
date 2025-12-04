@@ -35,7 +35,6 @@ const fonts = {
 }
 
 const googleLogo: ImageSourcePropType = require("../../assets/images/google-logo.png")
-const facebookLogo: ImageSourcePropType = require("../../assets/images/facebook-logo.png")
 
 const LoginScreen = () => {
   const router = useRouter()
@@ -172,11 +171,6 @@ const LoginScreen = () => {
               <Image source={googleLogo} style={styles.socialLogo} />
               <Text style={styles.socialButtonText}>Google</Text>
             </TouchableOpacity>
-
-            <TouchableOpacity style={styles.socialButton}>
-              <Image source={facebookLogo} style={styles.socialLogo} />
-              <Text style={styles.socialButtonText}>Facebook</Text>
-            </TouchableOpacity>
           </View>
 
           <Text style={styles.termsText}>
@@ -275,11 +269,11 @@ const styles = StyleSheet.create({
    },
   socialLoginContainer: { 
     flexDirection: "row",
-    justifyContent: "space-between",
+    justifyContent: "center",
     marginBottom: 16 
   },
   socialButton: { 
-    flex: 1,
+    width: '66%',
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -287,8 +281,7 @@ const styles = StyleSheet.create({
     borderColor: colors.gray50,
     borderRadius: 12,
     paddingVertical: 14,
-    marginHorizontal: 4
-   },
+  },
   socialLogo: { 
     width: 20,
     height: 20,
