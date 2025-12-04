@@ -24,8 +24,9 @@ const PORT = process.env.PORT || 3000;
 // ==========================
 app.use(helmet());
 app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Aumenta o limite do body parser para permitir uploads base64 maiores (ex: PDFs)
+app.use(express.json({ limit: '5mb' }));
+app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 
 // ==========================
 // ROTA DE VERIFICAÇÃO
@@ -48,6 +49,8 @@ import appointmentsRoutes from "./routes/appointments.js";
 import historyRoutes from "./routes/history.js";
 import rankingRoutes from "./routes/ranking.js";
 import debugRoutes from "./routes/debug.js";
+import authorizationRoutes from "./routes/authorization.js";
+import uploadsRoutes from "./routes/uploads.js";
 
 app.use("/api", routes);
 app.use("/auth", authRoutes);
@@ -63,13 +66,47 @@ try {
   console.warn('Não foi possível criar uploads dir:', err.message);
 }
 app.use('/uploads', express.static(uploadsDir));
+// Serve static docs (e.g. authorization PDF). The project `docs` folder may live
+// in the repository root, not inside the `backend` folder when the server is
+// started from `backend`. Try a list of candidate locations and serve the
+// first one that exists.
+// Try several likely locations for a top-level `docs` folder. We include
+// process.cwd(), one level up, two levels up and three levels up to handle
+// different working-directory setups when the server is launched.
+const candidateDocs = [
+  path.join(process.cwd(), 'docs'),
+  path.join(process.cwd(), '..', 'docs'),
+  path.join(process.cwd(), '..', '..', 'docs'),
+  path.join(process.cwd(), '..', '..', '..', 'docs'),
+]
+let servedDocsDir = null
+for (const d of candidateDocs) {
+  try {
+    console.log('Checking docs candidate:', d)
+    if (fs.existsSync(d)) {
+      servedDocsDir = d
+      break
+    }
+  } catch (err) {
+    console.warn('Error while checking docs candidate', d, err && err.message)
+  }
+}
+if (servedDocsDir) {
+  app.use('/docs', express.static(servedDocsDir))
+  console.log('Servindo /docs a partir de', servedDocsDir)
+} else {
+  console.warn('Aviso: nenhum diretório `docs` encontrado nas localizações esperadas. /docs ficará indisponível.')
+}
 app.use("/api/posts", postsRoutes);
 app.use("/api/campaigns", campaignsRoutes);
 app.use("/api/appointments", appointmentsRoutes);
 app.use("/api/history", historyRoutes);
 app.use("/api/ranking", rankingRoutes);
+app.use("/api/uploads", uploadsRoutes);
 // Dev debug route: returns raw header and decoded payload (does its own verification)
 app.use("/api/debug", debugRoutes);
+// Rota para download do modelo de autorização (ex: /authorization-model)
+app.use("/authorization-model", authorizationRoutes);
 
 // ==========================
 // MIDDLEWARE GLOBAL DE ERRO

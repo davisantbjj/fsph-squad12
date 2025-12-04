@@ -193,6 +193,8 @@ CREATE TABLE agendamentos (
     telefone_doador VARCHAR(20),
     email_doador VARCHAR(255),
     data_nascimento_doador DATE,
+    -- Campo para armazenar referência ao arquivo de autorização (quando aplicável)
+    authorization_file VARCHAR(255) NULL,
     status_agendamento VARCHAR(50),
     data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (id_usuario) REFERENCES usuarios(id_usuario),

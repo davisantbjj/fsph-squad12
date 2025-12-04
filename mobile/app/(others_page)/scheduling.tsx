@@ -1,7 +1,7 @@
 import { EvilIcons, Feather } from "@expo/vector-icons"
 import { useRouter } from "expo-router"
 import * as React from "react"
-import { useState, useMemo, useEffect } from "react"
+import { useState, useMemo, useEffect, useCallback } from "react"
 import {
   LayoutAnimation,
   Platform,
@@ -14,10 +14,15 @@ import {
   View,
   Modal,
   Dimensions, // Importado para cálculo de largura do calendário
+  Linking,
   Alert,
 } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 import api from "@/src/services/api"
+import * as DocumentPicker from 'expo-document-picker'
+// Use legacy FileSystem API for downloadAsync to avoid deprecation warnings
+// and ensure compatibility with the current expo-file-system version.
+import * as FileSystem from 'expo-file-system/legacy'
 
 // Habilita animação de layout no Android
 if (
@@ -195,13 +200,158 @@ export default function SchedulingPage() {
     return selectedDate !== null && selectedTime !== null
   }, [selectedDate, selectedTime])
 
+  // Estado para o arquivo de autorização (se for menor de idade)
+  const [authorizationFile, setAuthorizationFile] = useState<{
+    filename: string
+    content_base64: string
+    mimeType?: string | null
+  } | null>(null)
+  const [authorizationSelecting, setAuthorizationSelecting] = useState(false)
+  const [authorizationUploading, setAuthorizationUploading] = useState(false)
+  const [authorizationUploadedPath, setAuthorizationUploadedPath] = useState<string | null>(null)
+
+  const getAgeFromDOB = useCallback((dob?: string) => {
+    if (!dob) return null
+    // aceita formatos dd/mm/aaaa, dd-mm-aaaa ou ISO (yyyy-mm-dd)
+    const normalized = dob.trim()
+    let d: Date | null = null
+    if (/^\d{2}[\/\-]\d{2}[\/\-]\d{4}$/.test(normalized)) {
+      const parts = normalized.split(/\D/)
+      const day = Number(parts[0])
+      const month = Number(parts[1])
+      const year = Number(parts[2])
+      d = new Date(year, month - 1, day)
+    } else {
+      const parsed = new Date(normalized)
+      d = isNaN(parsed.getTime()) ? null : parsed
+    }
+    if (!d) return null
+    const ageDifMs = Date.now() - d.getTime()
+    const ageDate = new Date(ageDifMs)
+    return Math.abs(ageDate.getUTCFullYear() - 1970)
+  }, [])
+
+  const onPickAuthorization = useCallback(async () => {
+    console.log('[scheduling] onPickAuthorization invoked')
+    Alert.alert('Teste', 'Abrindo seletor de arquivo...')
+    setAuthorizationSelecting(true)
+    try {
+      const res = await DocumentPicker.getDocumentAsync({ type: '*/*', copyToCacheDirectory: true })
+      console.log('[scheduling] DocumentPicker result:', res)
+      // Support both the older response shape and the newer `assets` array shape.
+      let uri: string | undefined = undefined
+      let filename = 'authorization'
+      let mimeType: string | null = null
+
+      if (res && Array.isArray((res as any).assets) && (res as any).assets.length > 0) {
+        const asset = (res as any).assets[0]
+        uri = asset.uri
+        filename = asset.name || filename
+        mimeType = asset.mimeType || asset.type || null
+        Alert.alert('Picker resultado', `name: ${filename}\nuri: ${uri}\nmimeType: ${mimeType}`)
+      } else if ((res as any).type === 'success' || (res as any).canceled === false) {
+        // older API
+        uri = (res as any).uri
+        filename = (res as any).name || filename
+        mimeType = (res as any).mimeType || null
+        Alert.alert('Picker resultado', `name: ${filename}\nuri: ${uri}\nmimeType: ${mimeType}`)
+      } else {
+        // canceled or unknown
+        console.log('[scheduling] DocumentPicker cancelled or returned unknown shape', res)
+      }
+
+      if (uri) {
+        let content_base64: string | null = null
+
+        // First attempt: direct read (works for file:// URIs)
+        try {
+          content_base64 = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 })
+        } catch (errRead) {
+          console.warn('readAsStringAsync failed, trying downloadAsync fallback', errRead)
+          // Fallback: download the resource to cache and read from there
+          try {
+            const dest = FileSystem.cacheDirectory + filename
+            const dl = await FileSystem.downloadAsync(uri, dest)
+            content_base64 = await FileSystem.readAsStringAsync(dl.uri, { encoding: FileSystem.EncodingType.Base64 })
+          } catch (errDl) {
+            console.error('Fallback download failed:', errDl)
+            throw errDl
+          }
+        }
+
+        if (!content_base64) throw new Error('Não foi possível ler o arquivo selecionado')
+        const fileObj = { filename, content_base64, mimeType: mimeType || null }
+        setAuthorizationFile(fileObj)
+        Alert.alert('Arquivo selecionado', filename)
+
+        // Auto-upload immediately so the user sees confirmation before submitting
+        try {
+          setAuthorizationUploading(true)
+          const uploadRes = await api.post('/api/uploads/authorization', fileObj)
+          const uploadedPath = uploadRes.data?.path || null
+          setAuthorizationUploadedPath(uploadedPath)
+          if (uploadedPath) {
+            Alert.alert('Arquivo enviado', 'Arquivo enviado com sucesso.')
+          }
+        } catch (e) {
+          console.error('Erro ao fazer upload automático do arquivo:', e)
+          Alert.alert('Aviso', 'Arquivo selecionado, mas falha ao enviar automaticamente. Será enviado ao confirmar o agendamento.')
+        } finally {
+          setAuthorizationUploading(false)
+        }
+      }
+    } catch (e) {
+      console.error('Erro ao selecionar arquivo:', e)
+      Alert.alert('Erro', 'Não foi possível selecionar o arquivo de autorização.')
+    } finally {
+      setAuthorizationSelecting(false)
+    }
+  }, [])
+
+  const downloadAuthorizationModel = useCallback(async () => {
+    try {
+      const url = `${api.defaults.baseURL || ''}/authorization-model`
+      // Try opening in external browser first
+      const can = await Linking.canOpenURL(url)
+      if (can) {
+        await Linking.openURL(url)
+        return
+      }
+    } catch (e) {
+      // continue to fallback download
+    }
+
+    try {
+      const remote = `${api.defaults.baseURL || ''}/docs/Autorizacao-de-Menores-de-Idade.pdf`
+      const filename = 'Autorizacao-de-Menores-de-Idade.pdf'
+      const dest = FileSystem.documentDirectory + filename
+      const res = await FileSystem.downloadAsync(remote, dest)
+      const localUri = res.uri
+      Alert.alert('Download concluído', 'Arquivo salvo em: ' + localUri, [
+        { text: 'Abrir', onPress: () => Linking.openURL(localUri).catch(() => Alert.alert('Erro', 'Não foi possível abrir o arquivo.')) },
+        { text: 'OK' },
+      ])
+    } catch (err) {
+      console.error('Erro ao baixar modelo de autorização:', err)
+      Alert.alert('Erro', 'Não foi possível baixar o modelo de autorização.')
+    }
+  }, [])
+
+  const donorAge = getAgeFromDOB(dataNascimento)
+
   const isAdvanceEnabled = useMemo(() => {
     if (open) return selected !== null
     if (openPre) return isPreTriageValid
     if (openDados) return isDonorDataValid
     if (openLocal) return isLocationValid
     if (openDataHora) return isDateTimeValid
-    if (openVerif) return true
+    if (openVerif) {
+      // Se doador for menor de 18, exige upload da autorização
+      if (getAgeFromDOB(dataNascimento) !== null && getAgeFromDOB(dataNascimento)! < 18) {
+        return Boolean(authorizationFile)
+      }
+      return true
+    }
     return false
   }, [
     open,
@@ -284,6 +434,32 @@ export default function SchedulingPage() {
         pre_triagem: {
           perguntas_respostas: selectedPreAnswers || {},
         },
+      }
+
+      // If we already uploaded the file (auto-upload on select), reuse the uploaded path.
+      if (authorizationUploadedPath) {
+        payload.donor_info.authorization_file = authorizationUploadedPath
+      } else if (authorizationFile) {
+        try {
+          setAuthorizationUploading(true)
+          const uploadRes = await api.post('/api/uploads/authorization', authorizationFile)
+          const uploadedPath = uploadRes.data?.path || null
+          setAuthorizationUploadedPath(uploadedPath)
+          if (uploadedPath) {
+            payload.donor_info.authorization_file = uploadedPath
+          } else {
+            // fallback: include the base64 in the payload (older backend behavior)
+            payload.donor_info.authorization_file = authorizationFile
+          }
+        } catch (e) {
+          console.error('Erro ao enviar arquivo de autorização para upload:', e)
+          Alert.alert('Erro', 'Não foi possível enviar o arquivo de autorização.')
+          setAuthorizationUploading(false)
+          setIsSubmitting(false)
+          return
+        } finally {
+          setAuthorizationUploading(false)
+        }
       }
 
       const res = await api.post('/api/appointments', payload)
@@ -402,6 +578,8 @@ export default function SchedulingPage() {
 
     loadProfileForScheduling()
   }, [])
+
+  
 
   const options = [
     { id: "individual", label: "Doação de Sangue Individual" },
@@ -889,6 +1067,44 @@ export default function SchedulingPage() {
                   onChangeText={handlePhoneChange}
                   keyboardType="phone-pad"
                 />
+                {/* Se doador for menor de idade, mostrar download + upload de autorização */}
+                {donorAge !== null && donorAge < 18 && (
+                  <View style={{ marginTop: 8 }}>
+                    <Text style={{ fontSize: 13, color: '#d32f2f', marginBottom: 6 }}>
+                      Doador menor de idade: é necessário autorização dos responsáveis.
+                    </Text>
+                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                      <TouchableOpacity
+                        style={[styles.select, { flex: 1, marginRight: 6 }]}
+                        onPress={downloadAuthorizationModel}
+                      >
+                        <Text style={styles.selectText}>Baixar modelo de autorização</Text>
+                        <Feather name="download" size={16} color="#bdbdbd" />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.select, { flex: 1, marginLeft: 6 }]}
+                        onPress={onPickAuthorization}
+                        disabled={authorizationSelecting || authorizationUploading}
+                      >
+                        {authorizationSelecting ? (
+                          <Text style={styles.selectText}>Selecionando...</Text>
+                        ) : authorizationUploading ? (
+                          <Text style={styles.selectText}>Enviando...</Text>
+                        ) : authorizationUploadedPath ? (
+                          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <Text style={[styles.selectText, { color: '#388e3c' }]}>{authorizationFile?.filename}</Text>
+                            <Feather name="check" size={16} color="#388e3c" style={{ marginLeft: 8 }} />
+                          </View>
+                        ) : authorizationFile ? (
+                          <Text style={styles.selectText}>{authorizationFile.filename}</Text>
+                        ) : (
+                          <Text style={styles.selectText}>Enviar autorização</Text>
+                        )}
+                        {!authorizationUploadedPath && <Feather name="upload" size={16} color="#bdbdbd" />}
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                )}
                 {!isDonorDataValid && (
                   <Text style={{ color: "red", fontSize: 12 }}>
                     Preencha todos os campos corretamente para continuar.

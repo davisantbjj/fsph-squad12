@@ -1,4 +1,6 @@
 import { getConnection } from "../config/database.js";
+import fs from 'fs/promises';
+import path from 'path';
 
 // Cria um novo agendamento e salva a pré-triagem
 export async function createAppointment(req, res) {
@@ -163,6 +165,46 @@ export async function createAppointment(req, res) {
     );
 
     const idAgendamento = resultAgendamento.insertId;
+
+    // 2.1 Se houve arquivo de autorização enviado pelo front, tratar dois formatos:
+    // - object com { filename, content_base64 } => salvar aqui (backward compat)
+    // - string com path retornado pelo endpoint de upload => apenas persistir no DB
+    try {
+      if (donor_info && donor_info.authorization_file) {
+        const auth = donor_info.authorization_file;
+        const uploadsDir = path.join(process.cwd(), 'uploads', 'authorizations');
+        await fs.mkdir(uploadsDir, { recursive: true });
+
+        if (typeof auth === 'string') {
+          // já é um caminho relativo ou absoluto retornado pelo endpoint de upload
+          try {
+            await connection.query(`ALTER TABLE agendamentos ADD COLUMN IF NOT EXISTS authorization_file VARCHAR(255) NULL`);
+          } catch (e) {}
+          try {
+            const relativePath = auth.startsWith('/') ? auth.slice(1) : auth;
+            await connection.query(`UPDATE agendamentos SET authorization_file = ? WHERE id_agendamento = ?`, [relativePath, idAgendamento]);
+          } catch (e) {
+            console.warn('Não foi possível salvar o caminho do arquivo no DB:', e.message || e);
+          }
+        } else if (typeof auth === 'object' && auth.content_base64) {
+          const safeFilename = `${idAgendamento}_${Date.now()}_${(auth.filename || 'authorization').replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+          const filePath = path.join(uploadsDir, safeFilename);
+          const buffer = Buffer.from(auth.content_base64 || '', 'base64');
+          await fs.writeFile(filePath, buffer);
+          try {
+            await connection.query(`ALTER TABLE agendamentos ADD COLUMN IF NOT EXISTS authorization_file VARCHAR(255) NULL`);
+          } catch (e) {}
+          try {
+            const relativePath = path.relative(process.cwd(), filePath).replace(/\\/g, '/');
+            await connection.query(`UPDATE agendamentos SET authorization_file = ? WHERE id_agendamento = ?`, [relativePath, idAgendamento]);
+          } catch (e) {
+            console.warn('Não foi possível salvar o caminho do arquivo no DB:', e.message || e);
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Erro ao processar arquivo de autorização:', e);
+    }
 
     // 2. Inserir Pré-Triagem (se houver dados)
     if (pre_triagem) {
