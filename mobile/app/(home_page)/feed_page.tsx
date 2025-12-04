@@ -15,7 +15,9 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useFocusEffect } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
+import { ThemedText } from "@/components/ThemedText";
+import api from "@/src/services/api";
 
 interface Post {
   id: string;
@@ -124,6 +126,39 @@ export default function FeedPage() {
       await AsyncStorage.setItem('posts', JSON.stringify(updatedPosts));
     } catch (error) {
       console.error('Erro ao salvar like:', error);
+    }
+  };
+
+  useFocusEffect(
+      React.useCallback(() => {
+        loadData();
+      }, [])
+    );
+    
+  const loadData = async () => {
+    try {
+      setLoading(true)
+      // 1. Carregar dados do usuário
+      // Tenta pegar do storage primeiro para ser mais rápido, mas idealmente valida token
+      const token = await AsyncStorage.getItem("user_token")
+      if (!token) {
+        // Quando não houver token, redirecionar para splash para recarregar todo o app
+        router.replace("/(login_page)/splash")
+        return
+      }
+
+      // Busca perfil
+      try {
+        // Backend mount: app.use("/api/users", userRoutes); -> Rota: /me
+        const profileRes = await api.get("/api/users/me")
+        setUserInfo(profileRes.data)
+      } catch (e) {
+        console.log("Erro ao carregar perfil", e)
+      }
+    } catch (error) {
+      console.error("Erro geral no loadData:", error)
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -372,3 +407,11 @@ const styles = StyleSheet.create({
     marginHorizontal: 24,
   },
 });
+
+function setLoading(arg0: boolean) {
+  throw new Error("Function not implemented.");
+}
+function setUserInfo(data: any) {
+  throw new Error("Function not implemented.");
+}
+
