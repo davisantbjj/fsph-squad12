@@ -234,7 +234,7 @@ export default function Frame116() {
       </View>
     )
   }
-  const isStatus = false
+  const isStatus = false;
 
   return (
     <SafeAreaView style={styles.parent}>

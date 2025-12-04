@@ -13,7 +13,7 @@ import {
   UIManager,
   View,
   Modal,
-  Dimensions,
+  Dimensions, // Importado para cálculo de largura do calendário
 } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 
@@ -25,15 +25,16 @@ if (
   UIManager.setLayoutAnimationEnabledExperimental(true)
 }
 
-// SIMULAÇÃO DE DADOS DE DISPONIBILIDADE
+// SIMULAÇÃO DE DADOS DE DISPONIBILIDADE (AJUSTADO PARA BLOCOS E VAGAS)
+// Estrutura: Dia => Array de { timeSlot: string, vacancies: number, location: string }
 const availableSlots = {
-  // Estrutura: Dia => Array de { timeSlot: string, vacancies: number, location: string }
+  // Simulação de Dezembro 2025
   "2025-12-05": [
     { timeSlot: "08:00 - 08:15", vacancies: 10, location: "HEMOSE" },
     { timeSlot: "08:15 - 08:30", vacancies: 13, location: "HEMOSE" },
     { timeSlot: "08:30 - 08:45", vacancies: 5, location: "HEMOSE" },
     { timeSlot: "08:45 - 09:00", vacancies: 15, location: "HEMOSE" },
-    { timeSlot: "09:00 - 09:15", vacancies: 0, location: "HEMOSE" },
+    { timeSlot: "09:00 - 09:15", vacancies: 0, location: "HEMOSE" }, // Esgotado
     { timeSlot: "09:15 - 09:30", vacancies: 12, location: "HEMOSE" },
   ],
   "2025-12-06": [
@@ -63,7 +64,7 @@ const availableSlots = {
   ],
 } as Record<string, { timeSlot: string; vacancies: number; location: string }[]>
 
-// Funções Auxiliares (mantidas)
+// Função auxiliar para formatar a data de exibição (dia/mês)
 const formatDate = (dateString: string) => {
   if (!dateString) return ""
   const [year, month, day] = dateString.split("-")
@@ -85,7 +86,7 @@ const getDayOfWeekAndDate = (dateString: string) => {
   return dateMap[dateString] || formatDate(dateString)
 }
 
-// SIMULAÇÃO DA ESTRUTURA DO CALENDÁRIO
+// SIMULAÇÃO DA ESTRUTURA DO CALENDÁRIO (Dezembro 2025)
 const calendarDays = [
   null,
   "2025-12-01",
@@ -134,10 +135,9 @@ export default function SchedulingPage() {
   const [openDataHora, setOpenDataHora] = useState(false)
   const [openVerif, setOpenVerif] = useState(false)
 
-  // Estados de Modal
+  // Novo Estado para o Modal de Data/Hora
   const [showDateTimeModal, setShowDateTimeModal] = useState(false)
   const [selectedDay, setSelectedDay] = useState<string | null>(null)
-  const [showSuccessModal, setShowSuccessModal] = useState(false)
 
   // Tipo de agendamento
   const [selected, setSelected] = useState<string | null>(null)
@@ -157,63 +157,21 @@ export default function SchedulingPage() {
     return isValid
   }, [selectedPreAnswers])
 
-  // DADOS DA CAMPANHA (NOVOS ESTADOS)
-  const isCampaignSelected = selected === "campaign"
-  const bloodTypes = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"]
-  const [selectedBloodTypes, setSelectedBloodTypes] = useState<string[]>([]) // <--- ALTERADO PARA ARRAY
-  const [requiredDonors, setRequiredDonors] = useState<string>("")
-
-  // Lógica para selecionar/desselecionar tipos sanguíneos (com limite de 4)
-  const toggleBloodType = (type: string) => {
-    setSelectedBloodTypes((prev) => {
-      if (prev.includes(type)) {
-        // Desseleciona se já estiver no array
-        return prev.filter((t) => t !== type)
-      } else if (prev.length < 4) {
-        // Seleciona se o limite não foi atingido
-        return [...prev, type]
-      }
-      // Se o limite foi atingido, retorna o array sem alteração
-      return prev
-    })
-  }
-
   // Dados do Doador
   const [cpf, setCpf] = useState<string>("")
   const [nome, setNome] = useState<string>("")
   const [dataNascimento, setDataNascimento] = useState<string>("")
   const [email, setEmail] = useState<string>("")
   const [telefone, setTelefone] = useState<string>("")
-
   const isDonorDataValid = useMemo(() => {
-    const isBaseDataValid =
+    return (
       cpf.length === 14 &&
       nome.trim().length > 0 &&
       dataNascimento.length === 10 &&
       email.trim().length > 0 &&
       telefone.length >= 14
-
-    if (isCampaignSelected) {
-      // Regra extra para Campanha: exige PELO MENOS UM tipo sanguíneo e quantidade
-      return (
-        isBaseDataValid &&
-        selectedBloodTypes.length > 0 &&
-        requiredDonors.trim().length > 0 &&
-        !isNaN(Number(requiredDonors))
-      )
-    }
-
-    return isBaseDataValid
-  }, [
-    cpf,
-    nome,
-    dataNascimento,
-    email,
-    telefone,
-    isCampaignSelected,
-    selectedBloodTypes,
-    requiredDonors,
-  ])
+    )
+  }, [cpf, nome, dataNascimento, email, telefone])
 
   // Local de Doação: cidades e locais
   const [selectedCity, setSelectedCity] = useState<string | null>(null)
@@ -234,10 +192,6 @@ export default function SchedulingPage() {
   const isDateTimeValid = useMemo(() => {
     return selectedDate !== null && selectedTime !== null
   }, [selectedDate, selectedTime])
-
-  // ==============================================================================
-  // LÓGICA DE NAVEGAÇÃO
-  // ==============================================================================
 
   const isAdvanceEnabled = useMemo(() => {
     if (open) return selected !== null
@@ -261,24 +215,13 @@ export default function SchedulingPage() {
     isDateTimeValid,
   ])
 
-  // Avança para o próximo card (COM REGRA DE REDIRECIONAMENTO)
-  const goToNext = () => {
+  const goToPrev = () => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut)
-
-    // 1. Etapa de Tipo de Agendamento
     if (open && selected !== null) {
       setOpen(false)
-      if (selected === "campaign") {
-        // REGRA DE NEGÓCIO: PULAR PRÉ-TRIAGEM E IR DIRETO PARA DADOS
-        setOpenDados(true)
-        setOpenPre(false) // Garantir que Pré-Triagem está fechada
-      } else {
-        setOpenPre(true)
-      }
+      setOpenPre(true)
       return
     }
-
-    // 2. Outras Etapas (mantém o fluxo original)
     if (openPre && isPreTriageValid) {
       setOpenPre(false)
       setOpenDados(true)
@@ -299,31 +242,13 @@ export default function SchedulingPage() {
       setOpenVerif(true)
       return
     }
-    if (openVerif && isAdvanceEnabled) {
-      // Finalização
-      setShowSuccessModal(true)
-      console.log("Fluxo finalizado e Modal de Sucesso Aberto!")
-      return
+    if (openVerif) {
+      console.log("Fluxo finalizado e Agendamento Confirmado!")
     }
   }
 
   const goToPrev = () => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut)
-
-    // 1. Voltar da etapa Dados do Doador
-    if (openDados) {
-      setOpenDados(false)
-      if (isCampaignSelected) {
-        // Se for Campanha, volta para a primeira etapa
-        setOpen(true)
-      } else {
-        // Se não for Campanha, volta para Pré-Triagem
-        setOpenPre(true)
-      }
-      return
-    }
-
-    // 2. Outras Etapas (mantém o fluxo original)
     if (openVerif) {
       setOpenVerif(false)
       setOpenDataHora(true)
@@ -339,6 +264,11 @@ export default function SchedulingPage() {
       setOpenDados(true)
       return
     }
+    if (openDados) {
+      setOpenDados(false)
+      setOpenPre(true)
+      return
+    }
     if (openPre) {
       setOpenPre(false)
       setOpen(true)
@@ -349,12 +279,12 @@ export default function SchedulingPage() {
     }
   }
 
-  // Lógica para selecionar a data e hora final (usada pelo Modal)
   const handleSlotSelection = (day: string, timeSlot: string) => {
     setSelectedDate(day)
+    // O timeSlot já contém a informação de horário (ex: "08:00 - 08:15")
     setSelectedTime(timeSlot)
-    setSelectedDay(null)
-    setShowDateTimeModal(false)
+    setSelectedDay(null) // Reseta o dia selecionado no modal
+    setShowDateTimeModal(false) // Fecha o modal
   }
 
   // Funções de formatação de input (mantidas)
@@ -401,52 +331,7 @@ export default function SchedulingPage() {
     { id: "no", label: "Não" },
   ]
 
-  // ==============================================================================
-  // COMPONENTES DE MODAL
-  // ==============================================================================
-
-  // Modal de Sucesso (Mantido)
-  const SuccessModal = () => {
-    return (
-      <Modal
-        animationType="fade"
-        transparent={true}
-        visible={showSuccessModal}
-        onRequestClose={() => setShowSuccessModal(false)}
-      >
-        <View style={modalStyles.centeredView}>
-          <View style={successModalStyles.successModalView}>
-            {/* Ícone de Coração Vermelho */}
-            <View style={successModalStyles.heartIconContainer}>
-              <Feather name="heart" size={50} color="white" />
-            </View>
-
-            <Text style={successModalStyles.successTitle}>
-              Agendamento Realizado!
-            </Text>
-
-            <Text style={successModalStyles.successMessage}>
-              Seu agendamento está feito! Prepare-se para ser um(a) herói
-              (heroína) da vida real.
-            </Text>
-
-            {/* Botão de Fechar/Continuar - Opcional, mantendo apenas o X para fechar */}
-            <TouchableOpacity
-              style={successModalStyles.closeButton}
-              onPress={() => {
-                setShowSuccessModal(false)
-                router.replace("/(home_page)/home_page")
-              }}
-            >
-              <EvilIcons name="close" size={30} color="#444" />
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-    )
-  }
-
-  // Componente do Modal de Data/Hora (Mantido)
+  // Componente do Modal de Data/Hora (Pop-up)
   const DateTimeModal = () => {
     const daysOfWeek = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SÁB"]
     const slots = selectedDay ? availableSlots[selectedDay] || [] : []
@@ -627,7 +512,7 @@ export default function SchedulingPage() {
     )
   }
 
-  // Componente do Card de Data e Hora (Mantido)
+  // Componente do Card de Data e Hora
   const DateTimeCard = () => {
     const displayDate = selectedDate ? formatDate(selectedDate) : null
     const displayDateTime =
@@ -638,7 +523,7 @@ export default function SchedulingPage() {
     return (
       <View style={styles.cardBody}>
         <Text style={styles.instruction}>
-          Selecione uma data e horário disponíveis no hemonúcleo.
+          Selecione uma data e o bloco:
         </Text>
         <TouchableOpacity
           style={[styles.select, isDateTimeValid && { borderColor: "#d32f2f" }]}
@@ -665,7 +550,7 @@ export default function SchedulingPage() {
     )
   }
 
-  // Componente de Perguntas de Pré-Triagem (Mantido)
+  // Componente de Perguntas de Pré-Triagem (Simplificado por brevidade)
   const PreTriageQuestions = () => {
     const questions = [
       { id: "primeira", label: "Primeira vez doando sangue?" },
@@ -773,9 +658,8 @@ export default function SchedulingPage() {
   // Estrutura principal do componente
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#fff" }}>
-      {/* Modais fixos no topo da stack */}
+      {/* O Pop-up de Data/Hora Fixo no topo da stack */}
       <DateTimeModal />
-      <SuccessModal />
 
       <View style={styles.header}>
         <TouchableOpacity
@@ -850,11 +734,11 @@ export default function SchedulingPage() {
           </View>
 
           {/* 2. Pré-Triagem */}
-          <View style={[styles.card, isCampaignSelected && styles.cardHidden]}>
+          <View style={styles.card}>
             <TouchableOpacity
               style={styles.cardHeader}
               onPress={() => {
-                if (!selected || isCampaignSelected) return
+                if (!selected) return
                 LayoutAnimation.configureNext(
                   LayoutAnimation.Presets.easeInEaseOut
                 )
@@ -877,12 +761,12 @@ export default function SchedulingPage() {
             )}
           </View>
 
-          {/* 3. Dados do Doador (COM CAMPOS CONDICIONAIS) */}
+          {/* 3. Dados do Doador */}
           <View style={styles.card}>
             <TouchableOpacity
               style={styles.cardHeader}
               onPress={() => {
-                if (!isCampaignSelected && !isPreTriageValid) return
+                if (!isPreTriageValid) return
                 LayoutAnimation.configureNext(
                   LayoutAnimation.Presets.easeInEaseOut
                 )
@@ -1016,17 +900,13 @@ export default function SchedulingPage() {
                 />
                 {!isDonorDataValid && (
                   <Text style={{ color: "red", fontSize: 12 }}>
-                    Preencha todos os campos
-                    {isCampaignSelected &&
-                      " (incluindo Tipo Sanguíneo e Quantidade) "}{" "}
-                    corretamente para continuar.
+                    Preencha todos os campos corretamente para continuar.
                   </Text>
                 )}
               </View>
             )}
           </View>
 
-          {/* 4. Local de Doação */}
           {/* 4. Local de Doação */}
           <View style={styles.card}>
             <TouchableOpacity
@@ -1187,10 +1067,6 @@ export default function SchedulingPage() {
                   {"\n"}- Tipo:{" "}
                   {options.find((o) => o.id === selected)?.label ||
                     "Não selecionado"}
-                  {isCampaignSelected &&
-                    `\n- Necessário: ${selectedBloodTypes.join(
-                      ", "
-                    )} (${requiredDonors} Doadores)`}
                   {"\n"}- Local: {selectedLocal} ({selectedCity}){"\n"}-
                   Data/Hora: {formatDate(selectedDate || "")} {selectedTime}
                   {"\n"}- Doador: {nome}
@@ -1225,65 +1101,12 @@ export default function SchedulingPage() {
   )
 }
 
-// ==============================================================================
-// ESTILOS
-// ==============================================================================
-
 const { width } = Dimensions.get("window")
 const calendarWidth = width * 0.9 - 40
 const dayButtonSize = calendarWidth / 7 - 4
 const timeSlotPadding = 10
 const timeSlotWidth = calendarWidth / 2 - timeSlotPadding
 
-// ESTILOS DO MODAL DE SUCESSO
-const successModalStyles = StyleSheet.create({
-  successModalView: {
-    margin: 20,
-    backgroundColor: "white",
-    borderRadius: 16,
-    padding: 30,
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-    width: "85%",
-    maxWidth: 350,
-  },
-  heartIconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: "#d32f2f",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 25,
-  },
-  successTitle: {
-    fontSize: 22,
-    fontFamily: "Roboto-Regular",
-    color: "#444",
-    textAlign: "center",
-    marginBottom: 15,
-  },
-  successMessage: {
-    fontSize: 16,
-    fontFamily: "Roboto-Regular",
-    color: "#777",
-    textAlign: "center",
-    lineHeight: 24,
-    marginBottom: 20,
-  },
-  closeButton: {
-    position: "absolute",
-    top: 10,
-    right: 10,
-    padding: 5,
-  },
-})
-
-// ESTILOS DO MODAL DE DATA/HORA
 const modalStyles = StyleSheet.create({
   centeredView: {
     flex: 1,
@@ -1345,6 +1168,9 @@ const modalStyles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-around",
     marginBottom: 8,
+    // Removendo borda inferior para maior semelhança com a imagem
+    // borderBottomWidth: 1,
+    // borderBottomColor: '#f0f0f0',
     paddingBottom: 4,
   },
   dayOfWeekText: {
@@ -1369,6 +1195,7 @@ const modalStyles = StyleSheet.create({
     margin: 2,
     borderRadius: 5,
     backgroundColor: "transparent",
+    // Adicionando borda sutil para se parecer com a célula da imagem
     borderWidth: 1,
     borderColor: "#f5f5f5",
   },
@@ -1395,6 +1222,7 @@ const modalStyles = StyleSheet.create({
     position: "absolute",
     bottom: 5,
   },
+  // ESTILOS PARA O BLOCO DE HORAS
   timeTitleContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -1429,6 +1257,7 @@ const modalStyles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
     backgroundColor: "white",
+    // Mantendo a sombra para dar profundidade (como na imagem)
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
@@ -1437,7 +1266,7 @@ const modalStyles = StyleSheet.create({
     marginBottom: 10,
   },
   timeSlotButtonDisabled: {
-    opacity: 0.6,
+    opacity: 0.6, // Suavizando a opacidade para indisponibilidade
   },
   timeSlotText: {
     fontSize: 14,
@@ -1446,7 +1275,7 @@ const modalStyles = StyleSheet.create({
     marginBottom: 4,
   },
   timeSlotTextDisabled: {
-    color: "#999",
+    color: "#999", // Mudando a cor, mas mantendo a linha por uma melhor UX
   },
   timeSlotLocation: {
     fontSize: 12,
@@ -1464,7 +1293,7 @@ const modalStyles = StyleSheet.create({
     borderColor: "#e0e0e0",
   },
   vacanciesTagDisabled: {
-    backgroundColor: "#dcdcdc",
+    backgroundColor: "#dcdcdc", // Mais sutil que vermelho puro
     borderColor: "#dcdcdc",
   },
   vacanciesText: {
@@ -1475,6 +1304,7 @@ const modalStyles = StyleSheet.create({
   vacanciesTextDisabled: {
     color: "#777",
   },
+  // Estilos de controle (mantidos)
   closeButton: {
     marginTop: 20,
     backgroundColor: "#444",
@@ -1510,6 +1340,7 @@ const modalStyles = StyleSheet.create({
   },
 })
 
+// Estilos existentes (styles) - Omitidos por brevidade
 const styles = StyleSheet.create({
   page: { flex: 1, padding: 16, backgroundColor: "#fff", gap: 12 },
   card: {
@@ -1652,54 +1483,4 @@ const styles = StyleSheet.create({
   },
   inputInline: { flex: 1, paddingVertical: 10, fontFamily: "Roboto-Regular" },
   iconButton: { padding: 8 },
-
-  // ESTILOS DE CAMPANHA
-  cardHidden: { display: "none" },
-  campaignFields: {
-    paddingVertical: 10,
-    marginBottom: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
-  },
-  bloodTypeSelection: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    marginBottom: 15,
-    marginTop: 5,
-  },
-  bloodTypeButton: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 5,
-    borderWidth: 1,
-    borderColor: "#bdbdbd",
-    backgroundColor: "#f5f5f5",
-  },
-  bloodTypeButtonActive: {
-    borderColor: "#d32f2f",
-    backgroundColor: "#f0dede",
-  },
-  bloodTypeButtonDisabled: {
-    opacity: 0.6,
-    borderColor: "#e0e0e0",
-  },
-  bloodTypeButtonText: {
-    fontSize: 14,
-    color: "#444",
-    fontFamily: "Roboto-Regular",
-  },
-  bloodTypeButtonTextActive: {
-    color: "#d32f2f",
-    fontFamily: "Roboto-Bold",
-  },
-  labeloptionRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 10,
-    paddingHorizontal: 8,
-    borderWidth: 1,
-    borderColor: "#f0dede",
-    borderRadius: 8,
-  },
 })
