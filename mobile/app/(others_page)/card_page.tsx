@@ -52,7 +52,7 @@ export default function CardPage() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+        <TouchableOpacity onPress={() => router.replace("/(home_page)/profile_page")} style={styles.backBtn}>
           <Feather name="arrow-left" size={22} color="#333" />
         </TouchableOpacity>
         <Text style={styles.title}>Cartão do Doador</Text>

@@ -1,7 +1,8 @@
 import { EvilIcons, Feather } from "@expo/vector-icons"
 import { useRouter } from "expo-router"
 import * as React from "react"
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
+import api from "@/src/services/api"
 import {
   LayoutAnimation,
   Platform,
@@ -142,6 +143,21 @@ export default function SchedulingPage() {
   // Tipo de agendamento
   const [selected, setSelected] = useState<string | null>(null)
 
+  // Campaign-related state and helpers
+  const isCampaignSelected = selected === "campaign"
+  const bloodTypes = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"]
+  const [selectedBloodTypes, setSelectedBloodTypes] = useState<string[]>([])
+  const toggleBloodType = (type: string) => {
+    setSelectedBloodTypes((prev) =>
+      prev.includes(type)
+        ? prev.filter((t) => t !== type)
+        : prev.length < 4
+        ? [...prev, type]
+        : prev
+    )
+  }
+  const [requiredDonors, setRequiredDonors] = useState<string>("")
+
   // Pré-Triagem
   const [selectedPreAnswers, setSelectedPreAnswers] = useState<
     Record<string, string | null>
@@ -215,7 +231,7 @@ export default function SchedulingPage() {
     isDateTimeValid,
   ])
 
-  const goToPrev = () => {
+  const goToNext = () => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut)
     if (open && selected !== null) {
       setOpen(false)
@@ -243,7 +259,62 @@ export default function SchedulingPage() {
       return
     }
     if (openVerif) {
-      console.log("Fluxo finalizado e Agendamento Confirmado!")
+      submitAppointment()
+      return
+    }
+  }
+
+  // Build payload and send to backend
+  const submitAppointment = async () => {
+    try {
+      // Ensure we have required fields
+      if (!selectedDate || !selectedTime || !selectedLocal) {
+        console.warn('Campos obrigatórios ausentes ao confirmar agendamento')
+        return
+      }
+
+      // selectedTime format: "HH:MM - HH:MM" -> take start
+      const startTime = selectedTime.split("-")[0].trim()
+      const dateTime = `${selectedDate} ${startTime}:00` // 'YYYY-MM-DD HH:MM:SS'
+
+      const donor_info = {
+        nome_completo: nome || undefined,
+        cpf: cpf || undefined,
+        telefone: telefone || undefined,
+        email: email || undefined,
+        data_nascimento: dataNascimento || undefined,
+      }
+
+      const pre_triagem = {
+        perguntas_respostas: selectedPreAnswers,
+      }
+
+      const payload = {
+        data_agendamento: dateTime,
+        tipo_agendamento: selected || 'individual',
+        local_agendamento: selectedLocal,
+        donor_info,
+        pre_triagem,
+      }
+
+      // If campaign, include campaign-specific info
+      if (selected === 'campaign') {
+        payload.campaign_info = {
+          blood_types: selectedBloodTypes,
+          required_donors: requiredDonors || null,
+        }
+      }
+
+      const res = await api.post('/api/appointments', payload)
+      console.info('Agendamento criado:', res.data)
+      // Navigate back to home or to history
+      router.replace('/(home_page)/home_page')
+    } catch (err: any) {
+      console.error('Erro ao criar agendamento:', err)
+      // Try to surface server message if present
+      const msg = err?.response?.data?.error || err?.message || 'Erro desconhecido'
+      // eslint-disable-next-line no-alert
+      alert('Não foi possível confirmar o agendamento: ' + msg)
     }
   }
 
@@ -320,6 +391,39 @@ export default function SchedulingPage() {
   const handlePhoneChange = (text: string) => {
     setTelefone(formatNumber(text))
   }
+
+  // Pre-fill donor fields from user's profile
+  useEffect(() => {
+    let mounted = true
+    const loadProfile = async () => {
+      try {
+        const res = await api.get("/api/users/me")
+        const user = res.data
+        if (!mounted || !user) return
+
+        if (user.cpf) setCpf(formatCPF(String(user.cpf)))
+        if (user.nome_completo) setNome(user.nome_completo)
+        if (user.email) setEmail(user.email)
+        if (user.telefone) setTelefone(formatNumber(String(user.telefone)))
+        if (user.data_nascimento) {
+          // backend stores ISO YYYY-MM-DD; convert to dd/mm/yyyy
+          const iso = String(user.data_nascimento).split("T")[0]
+          const parts = iso.split("-")
+          if (parts.length === 3) {
+            const formatted = `${parts[2]}/${parts[1]}/${parts[0]}`
+            setDataNascimento(formatted)
+          }
+        }
+      } catch (err) {
+        console.error("Erro ao carregar perfil para pré-preenchimento:", err)
+      }
+    }
+
+    loadProfile()
+    return () => {
+      mounted = false
+    }
+  }, [])
 
   const options = [
     { id: "individual", label: "Doação de Sangue Individual" },

@@ -17,6 +17,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import api from '@/src/services/api';
 
 export default function PostPage() {
   const router = useRouter();
@@ -24,6 +25,7 @@ export default function PostPage() {
   const [caption, setCaption] = useState("");
   const [isUploading, setIsUploading] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [profile, setProfile] = useState<any>(null);
 
   // Abre a câmera automaticamente quando a tela ganha foco
   useFocusEffect(
@@ -42,6 +44,22 @@ export default function PostPage() {
       return () => clearTimeout(timer);
     }, [])
   );
+
+  // Load user profile for avatar/username
+  useEffect(() => {
+    let mounted = true
+    const loadProfile = async () => {
+      try {
+        const res = await api.get('/api/users/me')
+        if (!mounted) return
+        setProfile(res.data)
+      } catch (err) {
+        console.log('Não foi possível carregar perfil no PostPage', err)
+      }
+    }
+    loadProfile()
+    return () => { mounted = false }
+  }, [])
 
   const openCamera = async () => {
     // Evita abrir a câmera múltiplas vezes
@@ -99,8 +117,8 @@ export default function PostPage() {
       // Criar novo post
       const newPost = {
         id: Date.now().toString(),
-        usuario: 'rental_dogood',
-        avatar: 'https://via.placeholder.com/40',
+        usuario: profile?.nome_completo || 'Usuário',
+        avatar: profile?.foto_perfil || 'https://via.placeholder.com/40',
         imagem: imageUri,
         legenda: caption,
         likes: 0,

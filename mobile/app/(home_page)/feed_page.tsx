@@ -15,7 +15,8 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useFocusEffect } from 'expo-router';
+import api from '../../src/services/api';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { ThemedText } from "@/components/ThemedText";
 
 interface Post {
@@ -35,6 +36,8 @@ export default function FeedPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
   const [showOptionsModal, setShowOptionsModal] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const router = useRouter();
 
   // Recarrega os posts sempre que a tela ganha foco
   useFocusEffect(
@@ -168,7 +171,12 @@ export default function FeedPage() {
       <View style={styles.postHeader}>
         <View style={styles.userInfo}>
           <Image
-            source={{ uri: post.avatar || "https://via.placeholder.com/40" }}
+            source={{
+              uri:
+                post.avatar && post.avatar !== "https://via.placeholder.com/40"
+                  ? post.avatar
+                  : userInfo?.foto_perfil || "https://via.placeholder.com/40",
+            }}
             style={styles.avatar}
           />
           <ThemedText style={styles.username}>
@@ -412,10 +420,5 @@ const styles = StyleSheet.create({
   },
 });
 
-function setLoading(arg0: boolean) {
-  throw new Error("Function not implemented.");
-}
-function setUserInfo(data: any) {
-  throw new Error("Function not implemented.");
-}
+// (removed test helper functions that caused runtime errors)
 
