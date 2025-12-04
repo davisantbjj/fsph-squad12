@@ -16,151 +16,172 @@ import {
   Text,
   TouchableOpacity,
   View,
-  ActivityIndicator
+  ActivityIndicator,
 } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 import { shadows } from "./_shadow"
 import api from "@/src/services/api"
 import AsyncStorage from "@react-native-async-storage/async-storage"
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect } from "@react-navigation/native"
 
 export default function Frame116() {
   const router = useRouter()
-  const [loading, setLoading] = React.useState(true);
-  const [userInfo, setUserInfo] = React.useState<any>(null);
-  const [estoque, setEstoque] = React.useState<any[]>([]);
-  const [lastEstoqueUpdate, setLastEstoqueUpdate] = React.useState<Date | null>(null);
-  const [nextAppointment, setNextAppointment] = React.useState<any>(null);
-  const [campaigns, setCampaigns] = React.useState<any[]>([]);
-  const [donationsCount, setDonationsCount] = React.useState<number>(0);
-  const [livesSaved, setLivesSaved] = React.useState<number>(0);
-  const [userProgress, setUserProgress] = React.useState<number>(0);
+  const [loading, setLoading] = React.useState(true)
+  const [userInfo, setUserInfo] = React.useState<any>(null)
+  const [estoque, setEstoque] = React.useState<any[]>([])
+  const [lastEstoqueUpdate, setLastEstoqueUpdate] = React.useState<Date | null>(
+    null
+  )
+  const [nextAppointment, setNextAppointment] = React.useState<any>(null)
+  const [campaigns, setCampaigns] = React.useState<any[]>([])
+  const [donationsCount, setDonationsCount] = React.useState<number>(0)
+  const [livesSaved, setLivesSaved] = React.useState<number>(0)
+  const [userProgress, setUserProgress] = React.useState<number>(0)
 
   // UseFocusEffect para recarregar dados sempre que a tela ganhar foco (ex: voltar do agendamento)
   useFocusEffect(
     React.useCallback(() => {
-      loadData();
+      loadData()
     }, [])
-  );
+  )
 
   const loadData = async () => {
     try {
-        setLoading(true);
-        // 1. Carregar dados do usuário
-        // Tenta pegar do storage primeiro para ser mais rápido, mas idealmente valida token
-        const token = await AsyncStorage.getItem('user_token');
-        if (!token) {
-          // Quando não houver token, redirecionar para splash para recarregar todo o app
-          router.replace('/(login_page)/splash');
-          return;
+      setLoading(true)
+      // 1. Carregar dados do usuário
+      // Tenta pegar do storage primeiro para ser mais rápido, mas idealmente valida token
+      const token = await AsyncStorage.getItem("user_token")
+      if (!token) {
+        // Quando não houver token, redirecionar para splash para recarregar todo o app
+        router.replace("/(login_page)/splash")
+        return
+      }
+
+      // Busca perfil
+      try {
+        // Backend mount: app.use("/api/users", userRoutes); -> Rota: /me
+        const profileRes = await api.get("/api/users/me")
+        setUserInfo(profileRes.data)
+      } catch (e) {
+        console.log("Erro ao carregar perfil", e)
+      }
+
+      // 2. Carregar Estoque
+      try {
+        // Backend mount: app.use("/api/estoque", estoqueRoutes);
+        const estoqueRes = await api.get("/api/estoque")
+        setEstoque(estoqueRes.data || [])
+        // marca o horário da última atualização localmente
+        setLastEstoqueUpdate(new Date())
+      } catch (e) {
+        console.log("Erro ao carregar estoque", e)
+      }
+
+      // 3. Carregar Agendamentos (pegar o próximo)
+      try {
+        // Backend mount: app.use("/api/appointments", appointmentsRoutes);
+        const apptRes = await api.get("/api/appointments")
+        // Filtra apenas agendamentos futuros ou pendentes
+        const tryParseDate = (val: any) => {
+          if (!val) return null
+          // If already a Date or number
+          if (val instanceof Date) return val
+          const asString = String(val)
+          let d = new Date(asString)
+          if (!isNaN(d.getTime())) return d
+          // Try replacing space with 'T' (common MySQL -> JS issue)
+          d = new Date(asString.replace(" ", "T"))
+          if (!isNaN(d.getTime())) return d
+          // Try appending seconds
+          d = new Date(asString.replace(" ", "T") + ":00")
+          if (!isNaN(d.getTime())) return d
+          return null
         }
 
-        // Busca perfil
+        const futureAppts = apptRes.data.filter((a: any) => {
+          const parsed = tryParseDate(a.data_agendamento)
+          return (
+            parsed &&
+            parsed.getTime() > Date.now() &&
+            a.status_agendamento !== "Cancelado"
+          )
+        })
+        // Ordena e pega o primeiro
+        if (futureAppts.length > 0) {
+          // Supondo que o back já retorna ordenado, mas garantindo
+          futureAppts.sort(
+            (a: any, b: any) =>
+              new Date(a.data_agendamento).getTime() -
+              new Date(b.data_agendamento).getTime()
+          )
+
+          const next = futureAppts[0]
+          const dateObj =
+            tryParseDate(next.data_agendamento) ||
+            new Date(next.data_agendamento)
+          // Formata data e hora simples
+          setNextAppointment({
+            local: next.local_agendamento,
+            data: dateObj.toLocaleDateString("pt-BR"),
+            hora: dateObj.toLocaleTimeString("pt-BR", {
+              hour: "2-digit",
+              minute: "2-digit",
+            }),
+          })
+        } else {
+          setNextAppointment(null)
+        }
+      } catch (e) {
+        console.log("Erro ao carregar agendamentos", e)
+      }
+
+      // 4. Carregar Campanhas
+      try {
+        // Backend mount: app.use("/api/campaigns", campaignsRoutes);
+        const campaignsRes = await api.get("/api/campaigns")
+        setCampaigns(campaignsRes.data || [])
+      } catch (e) {
+        console.log("Erro ao carregar campanhas", e)
+      }
+
+      // 5. Carregar Histórico do usuário para calcular estatísticas (remover dados mockados)
+      try {
+        const historyRes = await api.get("/api/history")
+        const historyData = historyRes.data || []
+        const donations = historyData.filter(
+          (h: any) => h.origin === "donation" || h.type === "Doação Realizada"
+        )
+        const donationsNumber = donations.length
+        // Estimativa simples: cada doação pode salvar ~3 vidas (ajustável se backend fornecer outra métrica)
+        const estimatedLives = donationsNumber * 3
+        setDonationsCount(donationsNumber)
+        setLivesSaved(estimatedLives)
+        // Try to compute a user progress percent based on ranking top value
         try {
-            // Backend mount: app.use("/api/users", userRoutes); -> Rota: /me
-            const profileRes = await api.get('/api/users/me');
-            setUserInfo(profileRes.data);
+          const rankingRes = await api.get("/api/ranking")
+          const ranking = rankingRes.data || []
+          const max =
+            ranking.length > 0
+              ? ranking[0].total_doacoes || ranking[0].total_doacoes === 0
+                ? Number(ranking[0].total_doacoes)
+                : ranking[0].total_doacoes ?? 0
+              : 0
+          const userTotal = donationsNumber
+          const percent = max > 0 ? Math.round((userTotal / max) * 100) : 0
+          setUserProgress(percent)
         } catch (e) {
-            console.log("Erro ao carregar perfil", e);
+          // ignore ranking errors, keep default
+          console.log("Erro ao carregar ranking para progresso do usuário", e)
         }
-
-        // 2. Carregar Estoque
-        try {
-          // Backend mount: app.use("/api/estoque", estoqueRoutes);
-          const estoqueRes = await api.get('/api/estoque');
-          setEstoque(estoqueRes.data || []);
-          // marca o horário da última atualização localmente
-          setLastEstoqueUpdate(new Date());
-        } catch (e) {
-          console.log("Erro ao carregar estoque", e);
-        }
-
-        // 3. Carregar Agendamentos (pegar o próximo)
-        try {
-            // Backend mount: app.use("/api/appointments", appointmentsRoutes);
-            const apptRes = await api.get('/api/appointments');
-          // Filtra apenas agendamentos futuros ou pendentes
-          const tryParseDate = (val: any) => {
-            if (!val) return null;
-            // If already a Date or number
-            if (val instanceof Date) return val;
-            const asString = String(val);
-            let d = new Date(asString);
-            if (!isNaN(d.getTime())) return d;
-            // Try replacing space with 'T' (common MySQL -> JS issue)
-            d = new Date(asString.replace(' ', 'T'));
-            if (!isNaN(d.getTime())) return d;
-            // Try appending seconds
-            d = new Date(asString.replace(' ', 'T') + ':00');
-            if (!isNaN(d.getTime())) return d;
-            return null;
-          };
-
-          const futureAppts = apptRes.data.filter((a: any) => {
-            const parsed = tryParseDate(a.data_agendamento);
-            return parsed && parsed.getTime() > Date.now() && a.status_agendamento !== 'Cancelado';
-          });
-            // Ordena e pega o primeiro
-            if (futureAppts.length > 0) {
-                // Supondo que o back já retorna ordenado, mas garantindo
-                futureAppts.sort((a: any, b: any) => new Date(a.data_agendamento).getTime() - new Date(b.data_agendamento).getTime());
-
-                const next = futureAppts[0];
-                const dateObj = tryParseDate(next.data_agendamento) || new Date(next.data_agendamento);
-                // Formata data e hora simples
-                setNextAppointment({
-                    local: next.local_agendamento,
-                    data: dateObj.toLocaleDateString('pt-BR'),
-                    hora: dateObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-                });
-            } else {
-                setNextAppointment(null);
-            }
-        } catch (e) {
-             console.log("Erro ao carregar agendamentos", e);
-        }
-
-        // 4. Carregar Campanhas
-        try {
-             // Backend mount: app.use("/api/campaigns", campaignsRoutes);
-             const campaignsRes = await api.get('/api/campaigns');
-             setCampaigns(campaignsRes.data || []);
-        } catch (e) {
-             console.log("Erro ao carregar campanhas", e);
-        }
-
-        // 5. Carregar Histórico do usuário para calcular estatísticas (remover dados mockados)
-        try {
-          const historyRes = await api.get('/api/history');
-          const historyData = historyRes.data || [];
-          const donations = historyData.filter((h: any) => h.origin === 'donation' || h.type === 'Doação Realizada');
-          const donationsNumber = donations.length;
-          // Estimativa simples: cada doação pode salvar ~3 vidas (ajustável se backend fornecer outra métrica)
-          const estimatedLives = donationsNumber * 3;
-          setDonationsCount(donationsNumber);
-          setLivesSaved(estimatedLives);
-          // Try to compute a user progress percent based on ranking top value
-          try {
-            const rankingRes = await api.get('/api/ranking');
-            const ranking = rankingRes.data || [];
-            const max = ranking.length > 0 ? (ranking[0].total_doacoes || ranking[0].total_doacoes === 0 ? Number(ranking[0].total_doacoes) : (ranking[0].total_doacoes ?? 0)) : 0;
-            const userTotal = donationsNumber;
-            const percent = max > 0 ? Math.round((userTotal / max) * 100) : 0;
-            setUserProgress(percent);
-          } catch (e) {
-            // ignore ranking errors, keep default
-            console.log('Erro ao carregar ranking para progresso do usuário', e);
-          }
-        } catch (e) {
-          console.log('Erro ao carregar histórico para stats', e);
-        }
-
+      } catch (e) {
+        console.log("Erro ao carregar histórico para stats", e)
+      }
     } catch (error) {
-        console.error("Erro geral no loadData:", error);
+      console.error("Erro geral no loadData:", error)
     } finally {
-        setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   const Line = () => {
     return <View style={styles.line} />
@@ -168,33 +189,50 @@ export default function Frame116() {
 
   // Mapeamento de níveis de alerta para texto e cor (simplificado)
   const normalize = (s?: string) => {
-    if (!s) return '';
+    if (!s) return ""
     try {
-      return s.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '').trim();
+      return s
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/\p{Diacritic}/gu, "")
+        .trim()
     } catch (e) {
       // fallback for environments without Unicode property escapes
-      return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+      return s
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .trim()
     }
-  };
+  }
 
   const getAlertLevel = (situacao?: string) => {
-      const key = normalize(situacao);
-      switch(key) {
-          case 'critico':
-          case 'critico': return { text: 'Crítico', color: '#D32F2F' }; // Vermelho
-          case 'alerta': return { text: 'Alerta', color: '#F57C00' };   // Laranja
-          case 'estavel':
-          case 'estavel': return { text: 'Estável', color: '#388E3C' }; // Verde
-          default: return { text: situacao || '---', color: '#999' };
-      }
-  };
+    const key = normalize(situacao)
+    switch (key) {
+      case "critico":
+      case "critico":
+        return { text: "Crítico", color: "#D32F2F" } // Vermelho
+      case "alerta":
+        return { text: "Alerta", color: "#F57C00" } // Laranja
+      case "estavel":
+      case "estavel":
+        return { text: "Estável", color: "#388E3C" } // Verde
+      default:
+        return { text: situacao || "---", color: "#999" }
+    }
+  }
 
   if (loading && !userInfo) {
-      return (
-          <View style={[styles.parent, { justifyContent: 'center', alignItems: 'center' }]}>
-              <ActivityIndicator size="large" color="#D32F2F" />
-          </View>
-      )
+    return (
+      <View
+        style={[
+          styles.parent,
+          { justifyContent: "center", alignItems: "center" },
+        ]}
+      >
+        <ActivityIndicator size="large" color="#D32F2F" />
+      </View>
+    )
   }
   const isStatus = false;
 

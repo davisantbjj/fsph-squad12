@@ -215,8 +215,7 @@ export default function SchedulingPage() {
     isDateTimeValid,
   ])
 
-  // Avança para o próximo card do fluxo
-  const goToNext = () => {
+  const goToPrev = () => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut)
     if (open && selected !== null) {
       setOpen(false)
@@ -746,6 +745,7 @@ export default function SchedulingPage() {
                 setOpenPre((s) => !s)
               }}
               activeOpacity={0.8}
+              disabled={isCampaignSelected}
             >
               <Text style={styles.cardTitle}>Pré-Triagem</Text>
               <EvilIcons
@@ -783,6 +783,73 @@ export default function SchedulingPage() {
             </TouchableOpacity>
             {openDados && (
               <View style={styles.cardBody}>
+                {/* NOVOS CAMPOS PARA CAMPANHA */}
+                {isCampaignSelected && (
+                  <View style={styles.campaignFields}>
+                    <Text style={styles.label}>
+                      Tipo Sanguíneo Necessário (Máx. 4)*
+                    </Text>
+
+                    {/* Exibe o texto de aviso se o limite for atingido */}
+                    {selectedBloodTypes.length === 4 && (
+                      <Text
+                        style={{
+                          color: "orange",
+                          marginBottom: 10,
+                          fontSize: 13,
+                        }}
+                      >
+                        Limite de 4 tipos sanguíneos atingido.
+                      </Text>
+                    )}
+
+                    {/* Simulação de lista de seleção rápida de tipos sanguíneos */}
+                    <View style={styles.bloodTypeSelection}>
+                      {bloodTypes.map((type) => {
+                        const active = selectedBloodTypes.includes(type)
+                        const disabled =
+                          !active && selectedBloodTypes.length >= 4
+
+                        return (
+                          <TouchableOpacity
+                            key={type}
+                            style={[
+                              styles.bloodTypeButton,
+                              active && styles.bloodTypeButtonActive,
+                              disabled && styles.bloodTypeButtonDisabled,
+                            ]}
+                            onPress={() => toggleBloodType(type)}
+                            disabled={disabled}
+                          >
+                            <Text
+                              style={[
+                                styles.bloodTypeButtonText,
+                                active && styles.bloodTypeButtonTextActive,
+                                disabled && { color: "#b0b0b0" }, // Cor mais clara para desabilitado
+                              ]}
+                            >
+                              {type}
+                            </Text>
+                          </TouchableOpacity>
+                        )
+                      })}
+                    </View>
+
+                    <Text style={styles.label}>
+                      Quantidade de Doadores Necessária*
+                    </Text>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Ex: 50"
+                      value={requiredDonors}
+                      onChangeText={(text) =>
+                        setRequiredDonors(text.replace(/[^0-9]/g, ""))
+                      }
+                      keyboardType="numeric"
+                    />
+                  </View>
+                )}
+
                 <Text style={styles.label}>CPF</Text>
                 <TextInput
                   style={styles.input}
@@ -886,7 +953,7 @@ export default function SchedulingPage() {
                     {cities.map((c) => (
                       <TouchableOpacity
                         key={c}
-                        style={styles.optionRow}
+                        style={styles.labeloptionRow}
                         onPress={() => {
                           setSelectedCity(c)
                           setShowCityList(false)
@@ -930,7 +997,7 @@ export default function SchedulingPage() {
                     {(locationsByCity[selectedCity] || []).map((loc) => (
                       <TouchableOpacity
                         key={loc}
-                        style={styles.optionRow}
+                        style={styles.labeloptionRow}
                         onPress={() => {
                           setSelectedLocal(loc)
                           setShowLocalList(false)
