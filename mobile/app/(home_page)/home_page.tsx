@@ -234,7 +234,6 @@ export default function Frame116() {
       </View>
     )
   }
-  const isStatus = false;
 
   return (
     <SafeAreaView style={styles.parent}>
@@ -350,18 +349,18 @@ export default function Frame116() {
         </View>
 
         {/* Agendamentos */}
-        {isStatus ? (
+        {nextAppointment ? (
           <View style={styles.scheduleContainer}>
             <View style={[styles.card, shadows.md, styles.appointmentCard]}>
               <Text style={styles.cardTitle}>Seu próximo agendamento</Text>
               <Text style={styles.appointmentDate}>
-                Sexta-feira, 3 de Outubro
+                {nextAppointment.data}
               </Text>
-              <Text style={styles.appointmentTime}>às 10:30</Text>
+              <Text style={styles.appointmentTime}>{nextAppointment.hora} às </Text>
               <View style={styles.appointmentLocationRow}>
                 <Ionicons name="location-outline" size={16} color="#999" />
                 <Text style={styles.appointmentLocationText}>
-                  Hemocentro de Sergipe
+                  {nextAppointment.local}
                 </Text>
               </View>
 
@@ -401,9 +400,7 @@ export default function Frame116() {
               </View>
               <View style={styles.cardContent}>
                 <Text style={styles.cardText}>
-                  {nextAppointment
-                    ? `${nextAppointment.local} — ${nextAppointment.data} às ${nextAppointment.hora}`
-                    : "Sem agendamentos próximos"}
+                   Sem agendamentos próximos
                 </Text>
                 <TouchableOpacity
                   style={styles.cardButton}
@@ -1050,6 +1047,7 @@ const styles = StyleSheet.create({
   },
   appointmentCard: {
     padding: 16,
+    alignItems: "flex-start",
   },
   appointmentSmallTitle: {
     fontSize: 14,

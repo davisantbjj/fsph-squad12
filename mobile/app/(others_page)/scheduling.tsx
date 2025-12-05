@@ -139,6 +139,8 @@ export default function SchedulingPage() {
   // Novo Estado para o Modal de Data/Hora
   const [showDateTimeModal, setShowDateTimeModal] = useState(false)
   const [selectedDay, setSelectedDay] = useState<string | null>(null)
+  const [showSuccessModal, setShowSuccessModal] = useState(false)
+
 
   // Tipo de agendamento
   const [selected, setSelected] = useState<string | null>(null)
@@ -180,13 +182,24 @@ export default function SchedulingPage() {
   const [email, setEmail] = useState<string>("")
   const [telefone, setTelefone] = useState<string>("")
   const isDonorDataValid = useMemo(() => {
-    return (
-      cpf.length === 14 &&
-      nome.trim().length > 0 &&
-      dataNascimento.length === 10 &&
-      email.trim().length > 0 &&
-      telefone.length >= 14
-    )
+     const isBaseDataValid =
+       cpf.length === 14 &&
+       nome.trim().length > 0 &&
+       dataNascimento.length === 10 &&
+       email.trim().length > 0 &&
+       telefone.length >= 14
+
+     if (isCampaignSelected) {
+       // Regra extra para Campanha: exige PELO MENOS UM tipo sanguíneo e quantidade
+       return (
+         isBaseDataValid &&
+         selectedBloodTypes.length > 0 &&
+         requiredDonors.trim().length > 0 &&
+         !isNaN(Number(requiredDonors))
+       )
+     }
+
+     return isBaseDataValid
   }, [cpf, nome, dataNascimento, email, telefone])
 
   // Local de Doação: cidades e locais
@@ -235,9 +248,16 @@ export default function SchedulingPage() {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut)
     if (open && selected !== null) {
       setOpen(false)
-      setOpenPre(true)
+      if (selected === "campaign") {
+        // REGRA DE NEGÓCIO: PULAR PRÉ-TRIAGEM E IR DIRETO PARA DADOS
+        setOpenDados(true)
+        setOpenPre(false) // Garantir que Pré-Triagem está fechada
+      } else {
+        setOpenPre(true)
+      }
       return
     }
+    
     if (openPre && isPreTriageValid) {
       setOpenPre(false)
       setOpenDados(true)
@@ -320,6 +340,20 @@ export default function SchedulingPage() {
 
   const goToPrev = () => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut)
+
+    // 1. Voltar da etapa Dados do Doador
+    if (openDados) {
+      setOpenDados(false)
+      if (isCampaignSelected) {
+        // Se for Campanha, volta para a primeira etapa
+        setOpen(true)
+      } else {
+        // Se não for Campanha, volta para Pré-Triagem
+        setOpenPre(true)
+      }
+      return
+    }
+
     if (openVerif) {
       setOpenVerif(false)
       setOpenDataHora(true)
@@ -615,6 +649,47 @@ export default function SchedulingPage() {
       </Modal>
     )
   }
+  // Componente do Modal de Sucesso
+  const SuccessModal = () => {
+    return (
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={showSuccessModal}
+        onRequestClose={() => setShowSuccessModal(false)}
+      >
+        <View style={modalStyles.centeredView}>
+          <View style={successModalStyles.successModalView}>
+            {/* Ícone de Coração Vermelho */}
+            <View style={successModalStyles.heartIconContainer}>
+              <Feather name="heart" size={50} color="white" />
+            </View>
+
+            <Text style={successModalStyles.successTitle}>
+              Agendamento Realizado!
+            </Text>
+
+            <Text style={successModalStyles.successMessage}>
+              Seu agendamento está feito! Prepare-se para ser um(a) herói
+              (heroína) da vida real.
+            </Text>
+
+            {/* Botão de Fechar/Continuar - Opcional, mantendo apenas o X para fechar */}
+            <TouchableOpacity
+              style={successModalStyles.closeButton}
+              onPress={() => {
+                setShowSuccessModal(false)
+                router.replace("/(home_page)/home_page")
+              }}
+            >
+              <EvilIcons name="close" size={30} color="#444" />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    )
+  }
+
 
   // Componente do Card de Data e Hora
   const DateTimeCard = () => {
@@ -764,6 +839,7 @@ export default function SchedulingPage() {
     <SafeAreaView style={{ flex: 1, backgroundColor: "#fff" }}>
       {/* O Pop-up de Data/Hora Fixo no topo da stack */}
       <DateTimeModal />
+      <SuccessModal />
 
       <View style={styles.header}>
         <TouchableOpacity
@@ -838,11 +914,11 @@ export default function SchedulingPage() {
           </View>
 
           {/* 2. Pré-Triagem */}
-          <View style={styles.card}>
+          <View style={[styles.card, isCampaignSelected && styles.cardHidden]}>
             <TouchableOpacity
               style={styles.cardHeader}
               onPress={() => {
-                if (!selected) return
+                if (!selected || isCampaignSelected) return
                 LayoutAnimation.configureNext(
                   LayoutAnimation.Presets.easeInEaseOut
                 )
@@ -870,7 +946,7 @@ export default function SchedulingPage() {
             <TouchableOpacity
               style={styles.cardHeader}
               onPress={() => {
-                if (!isPreTriageValid) return
+                if (!isPreTriageValid && !isPreTriageValid) return
                 LayoutAnimation.configureNext(
                   LayoutAnimation.Presets.easeInEaseOut
                 )
@@ -1166,14 +1242,14 @@ export default function SchedulingPage() {
             </TouchableOpacity>
             {openVerif && (
               <View style={styles.cardBody}>
-                <Text style={styles.instruction}>
+                <Text style={[styles.instruction, { gap: 10 }]}>
                   Revisão das informações antes de confirmar:
-                  {"\n"}- Tipo:{" "}
-                  {options.find((o) => o.id === selected)?.label ||
+                    {"\n"}- Tipo:{" "}
+                    {options.find((o) => o.id === selected)?.label ||
                     "Não selecionado"}
-                  {"\n"}- Local: {selectedLocal} ({selectedCity}){"\n"}-
-                  Data/Hora: {formatDate(selectedDate || "")} {selectedTime}
-                  {"\n"}- Doador: {nome}
+                    {"\n"}- Local: {selectedLocal} ({selectedCity})
+                    {"\n"}- Data/Hora: {formatDate(selectedDate || "")} {selectedTime}
+                    {"\n"}- Doador: {nome}
                 </Text>
               </View>
             )}
@@ -1210,6 +1286,53 @@ const calendarWidth = width * 0.9 - 40
 const dayButtonSize = calendarWidth / 7 - 4
 const timeSlotPadding = 10
 const timeSlotWidth = calendarWidth / 2 - timeSlotPadding
+
+const successModalStyles = StyleSheet.create({
+  successModalView: {
+    margin: 20,
+    backgroundColor: "white",
+    borderRadius: 16,
+    padding: 30,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+    width: "85%",
+    maxWidth: 350,
+  },
+  heartIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: "#d32f2f",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 25,
+  },
+  successTitle: {
+    fontSize: 22,
+    fontFamily: "Roboto-Regular",
+    color: "#444",
+    textAlign: "center",
+    marginBottom: 15,
+  },
+  successMessage: {
+    fontSize: 16,
+    fontFamily: "Roboto-Regular",
+    color: "#777",
+    textAlign: "center",
+    lineHeight: 24,
+    marginBottom: 20,
+  },
+  closeButton: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    padding: 5,
+  },
+})
 
 const modalStyles = StyleSheet.create({
   centeredView: {
@@ -1587,4 +1710,52 @@ const styles = StyleSheet.create({
   },
   inputInline: { flex: 1, paddingVertical: 10, fontFamily: "Roboto-Regular" },
   iconButton: { padding: 8 },
+  labeloptionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderWidth: 1,
+    borderColor: "#f0dede",
+    borderRadius: 8,
+  },
+  cardHidden: { display: "none" },
+  campaignFields: {
+    paddingVertical: 10,
+    marginBottom: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f0f0f0",
+  },
+  bloodTypeSelection: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 15,
+    marginTop: 5,
+  },
+  bloodTypeButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: "#bdbdbd",
+    backgroundColor: "#f5f5f5",
+  },
+  bloodTypeButtonActive: {
+    borderColor: "#d32f2f",
+    backgroundColor: "#f0dede",
+  },
+  bloodTypeButtonDisabled: {
+    opacity: 0.6,
+    borderColor: "#e0e0e0",
+  },
+  bloodTypeButtonText: {
+    fontSize: 14,
+    color: "#444",
+    fontFamily: "Roboto-Regular",
+  },
+  bloodTypeButtonTextActive: {
+    color: "#d32f2f",
+    fontFamily: "Roboto-Bold",
+  },
 })
