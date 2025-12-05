@@ -152,11 +152,11 @@ const CadastroScreen = () => {
     <View style={styles.safeArea}>
       <Stack.Screen options={{ headerShown: false }} />
       <StatusBar barStyle="light-content" backgroundColor={colors.primaryRed} />
-
       <View style={styles.formContainer}>
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-        >
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.formContainer}>
           <TextInput
             style={styles.input}
             placeholder="Insira o seu nome completo"
@@ -229,12 +229,11 @@ const CadastroScreen = () => {
              {loading ? (
                 <ActivityIndicator color={colors.white} />
               ) : (
-                <>
                   <Text style={styles.createAccountButtonText}>Criar conta</Text>
-                  <Feather name="arrow-up-right" size={20} color={colors.white} />
-                </>
               )}
+              <Feather name="arrow-up-right" size={20} color={colors.white} />
           </TouchableOpacity>
+          </View>
 
           <View style={styles.dividerContainer}>
             <View style={styles.dividerLine} />
@@ -243,10 +242,10 @@ const CadastroScreen = () => {
           </View>
 
           <View style={styles.socialLoginContainer}>
-            <TouchableOpacity
-                style={styles.socialButton}
-                onPress={() => promptAsync()}
-                disabled={!request || loading}
+            <TouchableOpacity 
+              style={styles.socialButton} 
+              onPress={() => promptAsync()}
+              disabled={!request}
             >
               <Image source={googleLogo} style={styles.socialLogo} />
               <Text style={styles.socialButtonText}>Google</Text>

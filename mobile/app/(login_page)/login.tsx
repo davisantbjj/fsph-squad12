@@ -106,9 +106,7 @@ const LoginScreen = () => {
     <View style={styles.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor={colors.primaryRed} />
       <View style={styles.formContainer}>
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-        >
+        <ScrollView showsVerticalScrollIndicator={false}>
           <View style={styles.loginContainer}>
             <TextInput
               style={styles.input}
@@ -128,7 +126,9 @@ const LoginScreen = () => {
                 value={senha}
                 onChangeText={setSenha}
               />
-              <TouchableOpacity onPress={() => setIsSenhaVisible(!isSenhaVisible)}>
+              <TouchableOpacity
+                onPress={() => setIsSenhaVisible(!isSenhaVisible)}
+              >
                 <Feather
                   name={isSenhaVisible ? "eye-off" : "eye"}
                   size={20}
@@ -137,7 +137,10 @@ const LoginScreen = () => {
               </TouchableOpacity>
             </View>
 
-            <TouchableOpacity>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => router.push("/(others_page)/forgot_password" as any)}
+            >
               <Text style={styles.forgotPasswordText}>Esqueci minha senha</Text>
             </TouchableOpacity>
 
@@ -163,8 +166,8 @@ const LoginScreen = () => {
           </View>
 
           <View style={styles.socialLoginContainer}>
-            <TouchableOpacity 
-              style={styles.socialButton} 
+            <TouchableOpacity
+              style={styles.socialButton}
               onPress={() => promptAsync()}
               disabled={!request}
             >
