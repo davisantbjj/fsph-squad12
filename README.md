@@ -1,50 +1,81 @@
-# Welcome to your Expo app 👋
+# 🩸 HEMOSE Mobile - Sistema de Apoio à Doação de Sangue
+### Projeto de Residência Tecnológica | Porto Digital + UNIT + HEMOSE
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+O **HEMOSE App** é uma solução Full Stack robusta desenvolvida pelo **Squad 12**. O desafio central foi modernizar a experiência do doador de sangue em Sergipe, criando um ecossistema digital que conecta o doador ao Centro de Hemoterapia de forma eficiente, segura e intuitiva.
 
-## Get started
+---
 
-1. Install dependencies
+## 🏗️ Arquitetura do Sistema
 
-   ```bash
-   npm install
-   ```
+O projeto foi construído utilizando a estratégia de **Monorepo**, garantindo que o contrato entre o servidor e o aplicativo mobile seja sempre consistente.
 
-2. Start the app
+* **Frontend Mobile**: Desenvolvido com **React Native (Expo)**, priorizando uma interface fluida e acessível para todos os tipos de usuários.
+* **Backend**: API construída em **Node.js** com o framework **Express**, seguindo princípios de arquitetura RESTful.
+* **Linguagem**: 100% **TypeScript**, garantindo segurança de tipos de ponta a ponta e reduzindo erros em tempo de execução.
+* **Versionamento**: Fluxo de trabalho colaborativo via Git, com gestão de branches e code reviews.
 
-   ```bash
-   npx expo start
-   ```
+---
 
-In the output, you'll find options to open the app in a
+## 🚀 Principais Funcionalidades
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+O aplicativo foi desenhado para cobrir toda a jornada do doador:
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+1.  **Triagem Digital (Anamnese)**: Formulário inteligente que pré-avalia a elegibilidade do doador antes mesmo dele sair de casa.
+2.  **Histórico de Doações**: Visualização detalhada de doações anteriores e controle de prazos para a próxima doação.
+3.  **Gestão de Agendamentos**: Integração com o calendário do HEMOSE para reserva de horários.
+4.  **Feed de Campanhas**: Notificações em tempo real sobre estoques críticos de tipos sanguíneos específicos.
+5.  **Carteira Digital**: Identificação do doador e tipo sanguíneo acessíveis via app.
 
-## Get a fresh project
+---
 
-When you're ready, run:
+## 🛠️ Stack Tecnológica
 
-```bash
-npm run reset-project
-```
+### **Mobile**
+* **React Native / Expo**: Framework principal.
+* **Expo Router**: Roteamento baseado em arquivos (moderno e intuitivo).
+* **Axios**: Integração para consumo de APIs.
+* **React Hook Form + Zod**: Para validações complexas de formulários de triagem.
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+### **Backend & Infra**
+* **Node.js**: Ambiente de execução.
+* **Express**: Framework web.
+* **TypeScript**: Superconjunto JavaScript para robustez.
+* **Shared Logic**: Pasta dedicada a interfaces e DTOs compartilhados entre as plataformas.
 
-## Learn more
+---
 
-To learn more about developing your project with Expo, look at the following resources:
+## 📂 Organização do Repositório
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+```text
+├── backend/       # API RESTful, Middlewares e Regras de Negócio
+├── mobile/        # App React Native (Expo) - Interface e UX
+├── shared/        # Tipagens (Interfaces) e constantes compartilhadas
+├── docs/          # Documentação de requisitos e fluxogramas
+└── package.json   # Gestão de dependências do ecossistema
+⚙️ Instalação e Execução
+1. Clonagem e Dependências
+Bash
+git clone [https://github.com/davisantbjj/fsph-squad12.git](https://github.com/davisantbjj/fsph-squad12.git)
+cd fsph-squad12
+npm install
+2. Rodando o Servidor (Backend)
+Bash
+cd backend
+npm run dev
+3. Rodando o App (Mobile)
+Bash
+cd mobile
+npx expo start
+Dica: Utilize o app Expo Go no seu celular para testar em tempo real.
 
-## Join the community
+🌟 Diferenciais do Projeto
+Escalabilidade: Estrutura pronta para suportar novos módulos (ex: integração com outros hemocentros).
 
-Join our community of developers creating universal apps.
+Segurança: Tratamento rigoroso de dados sensíveis de saúde.
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+Colaboração: Desenvolvido por 5 desenvolvedores sob metodologias ágeis.
+
+👥 Squad 12 - Desenvolvedores
+Davi Santana e equipe de residentes.
+
+Este projeto é um marco na nossa formação tecnológica, unindo inovação, saúde pública e desenvolvimento de software de alto nível.
